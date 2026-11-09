@@ -531,8 +531,7 @@ nsresult LockstoreService::DoDeleteKek(const nsACString& aKekRef) {
 
 Result<nsCString, nsresult> LockstoreService::DoResolveWrappingKek(
     const nsACString& aFallbackType, const nsACString& aFallbackIdentifier) {
-  bool passwordKekExists = false;
-  MOZ_TRY_VAR(passwordKekExists, DoKekExists(kProfilePasswordKek));
+  bool passwordKekExists = MOZ_TRY(DoKekExists(kProfilePasswordKek));
   if (passwordKekExists) {
     return nsCString(kProfilePasswordKek);
   }
