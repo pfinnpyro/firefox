@@ -10,6 +10,7 @@
 
 #include "mozilla/AppShutdown.h"
 #include "mozilla/ErrorResult.h"
+#include "mozilla/ProfileProtection.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Result.h"
 #include "mozilla/Services.h"
@@ -534,6 +535,9 @@ Result<nsCString, nsresult> LockstoreService::DoResolveWrappingKek(
   bool passwordKekExists = MOZ_TRY(DoKekExists(kProfilePasswordKek));
   if (passwordKekExists) {
     return nsCString(kProfilePasswordKek);
+  }
+  if (GetStartupProfileProtection().mEnabled) {
+    return Err(NS_ERROR_NOT_AVAILABLE);
   }
   return DoCreateKek(aFallbackType, aFallbackIdentifier, ""_ns,
                      /* cache_timeout_ms */ 0);

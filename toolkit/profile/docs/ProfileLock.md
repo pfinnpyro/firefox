@@ -277,6 +277,7 @@ refuses to run rather than run unprotected.
 | `protection.ini` present but unreadable | Treated as protected |
 | Password prompt cancelled, headless start, no prompt service | Quit |
 | Key store unreachable | Quit |
+| Something tries to create encrypted data before the password KEK exists (for example quit observers running while startup refuses the profile) | Refused: no DEK is ever created under a LocalKey in a protected profile |
 | Encrypted profile opened by a build or a session with encryption off | Refused by the existing encryption gate |
 | Protected profile already holding plaintext databases | Refused ("migration required") |
 | Sweep of local KEKs fails | Startup continues, data stays readable, retried at next startup |
@@ -339,6 +340,14 @@ of value:
   round-trips through `profiles.ini`, including section renumbering.
 - `browser/components/profilelock/test/unit/`: lock triggers (idle, screen
   lock, sleep, prefs) and the `protection.ini` reader and writer.
+- End to end, under Xvfb on Linux: a new protected profile asks for a new
+  password twice, opens, and Ctrl+Shift+L closes it. Afterwards every DEK in
+  the key store is wrapped only by `password:profile`, every SQLite database
+  (places, cookies, favicons, IndexedDB…) is in the obfsvfs format with no
+  plaintext schema, and `sessionstore.jsonlz4` starts with the `mozEnc0`
+  marker. The next start rejects a wrong password and opens with the right
+  one. A headless start of a protected profile quits without creating any
+  database or key.
 - Manual: create a protected profile, set a password, confirm that the data
   files under the profile are ciphertext (no SQLite header magic), that
   startup asks for the profile and the password every time, and that each

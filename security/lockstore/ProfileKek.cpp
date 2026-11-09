@@ -25,6 +25,7 @@
 #include "nsTArray.h"
 #include "nsThreadUtils.h"
 #include "pk11pub.h"
+#include "prenv.h"
 #include "prinrval.h"
 #include "prthread.h"
 
@@ -353,6 +354,13 @@ static bool SyncLockstoreWithPrimaryPassword() {
   }
 
   const bool syncIsSkippable = SyncIsSkippable(*sync, passwordRequired);
+
+  // Nothing can answer a prompt in headless mode, and a protected profile must
+  // not wait on one forever.
+  if (passwordRequired && PR_GetEnv("MOZ_HEADLESS")) {
+    NS_WARNING("A protected profile cannot be unlocked in headless mode");
+    return false;
+  }
 
   // Every sync from here on asks the user for the primary password.
   nsCOMPtr<nsIPromptService> ps(do_GetService(NS_PROMPTSERVICE_CONTRACTID));

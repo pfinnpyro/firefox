@@ -8,6 +8,7 @@
 #include "mozilla/Hex.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Services.h"
+#include "mozilla/ProfileProtection.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/StaticPrefs_security.h"
@@ -382,6 +383,43 @@ nsresult GetDatabaseEncryptionStatus(const nsACString& aDatabasePath,
   return NS_OK;
 }
 
+// The KEK a new DEK is wrapped under, resolved per DEK rather than once: a
+// database opened before the profile password exists (e.g. by the unlock
+// prompt itself) would otherwise pin the LocalKey, which the Profile Lock
+// sweep deletes. Under Profile Lock or the primary password link that is the
+// profile password KEK; otherwise the shared local:sqlite LocalKey.
+static nsresult ResolveWrappingKekLocked(nsCString& aOutKekRef)
+    MOZ_REQUIRES(sStateMutex) {
+  const nsCString passwordKek(
+      mozilla::security::lockstore::kProfilePasswordKek);
+  bool passwordKekExists = false;
+  if (NS_SUCCEEDED(
+          keystore_kek_exists(sHandle, &passwordKek, &passwordKekExists)) &&
+      passwordKekExists) {
+    aOutKekRef = passwordKek;
+    return NS_OK;
+  }
+  // A Profile Lock profile has no business creating data before its password
+  // exists (e.g. while startup is refusing to open it), and must never key it
+  // to a LocalKey.
+  if (mozilla::GetStartupProfileProtection().mEnabled) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  if (sKekRef.IsEmpty()) {
+    const nsCString kekType("local"_ns);
+    const nsCString kekId("sqlite"_ns);
+    const nsCString empty;
+    nsresult rv = keystore_create_kek(sHandle, &kekType, &kekId, &empty,
+                                      /* cache_timeout_ms */ 0, &sKekRef);
+    if (NS_FAILED(rv)) {
+      sKekRef.Truncate();
+      return rv;
+    }
+  }
+  aOutKekRef = sKekRef;
+  return NS_OK;
+}
+
 nsresult GetEncryptionKey(const nsACString& aDatabasePath, OpenIntent aIntent,
                           nsACString& aOutHexKey) {
   // The caller has already established via GetDatabaseEncryptionStatus that
@@ -440,34 +478,6 @@ nsresult GetEncryptionKey(const nsACString& aDatabasePath, OpenIntent aIntent,
     // LocalKey. create_kek with a fixed identifier is get-or-create: it
     // mints lockstore::kek::local:sqlite on first run and recovers it on
     // every later run, so we needn't persist the ref ourselves.
-    if (sKekRef.IsEmpty()) {
-      // Under Profile Lock (or the primary password link) new DEKs go under
-      // the profile password KEK, never under a LocalKey that unwraps without
-      // a secret.
-      const nsCString passwordKek(
-          mozilla::security::lockstore::kProfilePasswordKek);
-      bool passwordKekExists = false;
-      if (NS_SUCCEEDED(
-              keystore_kek_exists(sHandle, &passwordKek, &passwordKekExists)) &&
-          passwordKekExists) {
-        sKekRef = passwordKek;
-        rv = NS_OK;
-      } else {
-        const nsCString kekType("local"_ns);
-        const nsCString kekId("sqlite"_ns);
-        const nsCString empty;
-        rv = keystore_create_kek(sHandle, &kekType, &kekId, &empty,
-                                 /* cache_timeout_ms */ 0, &sKekRef);
-      }
-      if (NS_FAILED(rv)) {
-        sKekRef.Truncate();
-        MOZ_LOG(GetSQLiteEncryptionLog(), LogLevel::Error,
-                ("keystore_create_kek failed: 0x%" PRIx32,
-                 static_cast<uint32_t>(rv)));
-        return rv;
-      }
-    }
-
     rv = keystore_get_dek_automatic(sHandle, &collection, &dek);
     if (rv == NS_ERROR_NOT_AVAILABLE && aIntent == OpenIntent::CreateIfNew) {
       if (sMarkerWriteFailed) {
@@ -486,7 +496,15 @@ nsresult GetEncryptionKey(const nsACString& aDatabasePath, OpenIntent aIntent,
       // benign; the get_dek below is the arbiter. LoadExisting never mints a
       // key: a missing DEK for an existing database is a hard error (handled
       // below), not a cue to create one and make the contents unreadable.
-      nsresult crv = keystore_create_dek(sHandle, &collection, &sKekRef,
+      nsCString kekRef;
+      rv = ResolveWrappingKekLocked(kekRef);
+      if (NS_FAILED(rv)) {
+        MOZ_LOG(GetSQLiteEncryptionLog(), LogLevel::Error,
+                ("Failed to resolve the wrapping KEK: 0x%" PRIx32,
+                 static_cast<uint32_t>(rv)));
+        return rv;
+      }
+      nsresult crv = keystore_create_dek(sHandle, &collection, &kekRef,
                                          /* extractable */ true,
                                          /* key_size */ kDekBytes);
       if (NS_FAILED(crv)) {
@@ -494,7 +512,7 @@ nsresult GetEncryptionKey(const nsACString& aDatabasePath, OpenIntent aIntent,
                 ("create_dek returned 0x%" PRIx32 "; re-reading",
                  static_cast<uint32_t>(crv)));
       }
-      rv = keystore_get_dek(sHandle, &collection, &sKekRef, &dek);
+      rv = keystore_get_dek_automatic(sHandle, &collection, &dek);
     }
     if (NS_FAILED(rv)) {
       // For an existing in-profile database NS_ERROR_NOT_AVAILABLE is the exact
