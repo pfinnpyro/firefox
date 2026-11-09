@@ -469,6 +469,7 @@ const CONFIG_PANES = Object.freeze({
       "sync",
       "importBrowserData",
       "profiles",
+      "profileLock",
       "backup",
       "referrals",
     ],

@@ -33,6 +33,18 @@ export const ProfileKekPassword = {
       return;
     }
 
+    // Profile Lock encrypts the profile under this password; dropping it would
+    // move every DEK to a LocalKey that unwraps without any secret.
+    if (
+      newPassword == "" &&
+      Services.prefs.getBoolPref("browser.profileLock.active", false)
+    ) {
+      throw Components.Exception(
+        "Profile Lock requires a primary password",
+        Cr.NS_ERROR_NOT_AVAILABLE
+      );
+    }
+
     const lockstore = getLockstore();
 
     if (await lockstore.kekExists(PW_KEK)) {
@@ -65,6 +77,15 @@ export const ProfileKekPassword = {
   // leftovers that would otherwise keep asking for a password the reset is
   // about to destroy.
   async discard() {
+    // Under Profile Lock the session was opened with this password, so there
+    // is nothing to recover from, and moving the DEKs to a LocalKey would leave
+    // the profile unprotected on disk.
+    if (Services.prefs.getBoolPref("browser.profileLock.active", false)) {
+      throw Components.Exception(
+        "Profile Lock requires a primary password",
+        Cr.NS_ERROR_NOT_AVAILABLE
+      );
+    }
     const lockstore = getLockstore();
     if (!(await lockstore.kekExists(PW_KEK))) {
       return;

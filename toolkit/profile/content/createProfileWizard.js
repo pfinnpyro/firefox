@@ -11,6 +11,10 @@ const { AppConstants } = ChromeUtils.importESModule(
 
 const ToolkitProfileService = "@mozilla.org/toolkit/profile-service;1";
 
+const { writeProfileProtection } = ChromeUtils.importESModule(
+  "moz-src:///toolkit/profile/ProfileProtectionFile.sys.mjs"
+);
+
 var gProfileService;
 var gProfileManagerBundle;
 
@@ -48,6 +52,11 @@ function initWizard() {
     document
       .getElementById("create-profile-choose-folder")
       .addEventListener("command", () => chooseProfileFolder());
+    document
+      .getElementById("protectProfile")
+      .addEventListener("command", event => {
+        document.getElementById("privateOnly").disabled = !event.target.checked;
+      });
     document.getElementById("useDefault").addEventListener("command", () => {
       setDisplayToDefaultFolder();
       updateProfileDisplay();
@@ -264,6 +273,26 @@ function onFinish(event) {
 
     event.preventDefault();
     return;
+  }
+
+  if (document.getElementById("protectProfile").checked) {
+    try {
+      writeProfileProtection(profile.rootDir, {
+        privateOnly: document.getElementById("privateOnly").checked,
+      });
+      profile.requiresUnlock = true;
+    } catch (e) {
+      // An unprotected profile must not look protected. Keep the folder: the
+      // user may have picked one that holds other files.
+      profile.remove(false);
+      Services.prompt.alert(
+        window,
+        gProfileManagerBundle.getString("profileCreationFailedTitle"),
+        gProfileManagerBundle.getString("profileCreationFailed") + "\n" + e
+      );
+      event.preventDefault();
+      return;
+    }
   }
 
   if (window.arguments && window.arguments[1]) {

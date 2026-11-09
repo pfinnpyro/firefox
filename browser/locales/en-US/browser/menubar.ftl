@@ -121,6 +121,11 @@ menu-file-go-offline =
     .label = Work Offline
     .accesskey = k
 
+# Closes the browser so that the profile can only be reopened with its password.
+menu-file-lock-profile =
+    .label = Lock Profile
+    .accesskey = L
+
 ## Edit Menu
 
 menu-edit =

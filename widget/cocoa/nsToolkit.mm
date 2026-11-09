@@ -39,16 +39,64 @@ static io_connect_t gRootPort = MACH_PORT_NULL;
 
 nsToolkit* nsToolkit::gToolkit = nullptr;
 
+static id sScreenLockObserver = nil;
+static id sScreenUnlockObserver = nil;
+
+// The login window posts these distributed notifications when the screen is
+// locked and unlocked. Profile Lock listens for the resulting observer topics.
+static void RegisterForScreenLockNotifications() {
+  NS_OBJC_BEGIN_TRY_IGNORE_BLOCK;
+
+  NSDistributedNotificationCenter* center =
+      [NSDistributedNotificationCenter defaultCenter];
+  sScreenLockObserver =
+      [[center addObserverForName:@"com.apple.screenIsLocked"
+                           object:nil
+                            queue:[NSOperationQueue mainQueue]
+                       usingBlock:^(NSNotification* aNotification) {
+                         nsToolkit::PostSleepWakeNotification(
+                             NS_WIDGET_SESSION_LOCK_OBSERVER_TOPIC);
+                       }] retain];
+  sScreenUnlockObserver =
+      [[center addObserverForName:@"com.apple.screenIsUnlocked"
+                           object:nil
+                            queue:[NSOperationQueue mainQueue]
+                       usingBlock:^(NSNotification* aNotification) {
+                         nsToolkit::PostSleepWakeNotification(
+                             NS_WIDGET_SESSION_UNLOCK_OBSERVER_TOPIC);
+                       }] retain];
+
+  NS_OBJC_END_TRY_IGNORE_BLOCK;
+}
+
+static void RemoveScreenLockNotifications() {
+  NS_OBJC_BEGIN_TRY_IGNORE_BLOCK;
+
+  NSDistributedNotificationCenter* center =
+      [NSDistributedNotificationCenter defaultCenter];
+  for (id* observer : {&sScreenLockObserver, &sScreenUnlockObserver}) {
+    if (*observer) {
+      [center removeObserver:*observer];
+      [*observer release];
+      *observer = nil;
+    }
+  }
+
+  NS_OBJC_END_TRY_IGNORE_BLOCK;
+}
+
 nsToolkit::nsToolkit()
     : mSleepWakeNotificationRLS(nullptr),
       mPowerNotifier{0},
       mAllProcessMouseMonitor(nil) {
   MOZ_COUNT_CTOR(nsToolkit);
   RegisterForSleepWakeNotifications();
+  RegisterForScreenLockNotifications();
 }
 
 nsToolkit::~nsToolkit() {
   MOZ_COUNT_DTOR(nsToolkit);
+  RemoveScreenLockNotifications();
   RemoveSleepWakeNotifications();
   StopMonitoringAllProcessMouseEvents();
 }

@@ -80,6 +80,17 @@ interface nsIToolkitProfile : nsISupports
     [infallible] attribute boolean showProfileSelector;
 
     /**
+     * Whether this profile is protected by Profile Lock: its data is encrypted
+     * at rest and it can only be opened after the user explicitly selects it
+     * and enters its password. While any profile has this set, the profile
+     * manager is shown at every startup that doesn't name a profile.
+     *
+     * This is only a selection hint stored in profiles.ini. The encryption
+     * itself is driven by the profile's own protection.ini and lockstore.
+     */
+    [infallible] attribute boolean requiresUnlock;
+
+    /**
      * Removes the profile from the registry of profiles.
      *
      * @param removeFiles

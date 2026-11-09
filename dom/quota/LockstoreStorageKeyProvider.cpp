@@ -59,7 +59,7 @@ nsresult LockstoreStorageKeyProvider::EnsureKek() {
     return NS_OK;
   }
 
-  auto kekResult = mLockstore->DoCreateKek("local"_ns, ""_ns, ""_ns, 0);
+  auto kekResult = mLockstore->DoResolveWrappingKek("local"_ns, ""_ns);
   if (kekResult.isErr()) {
     return kekResult.unwrapErr();
   }

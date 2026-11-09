@@ -22,7 +22,10 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Logging.h"
 #include "mozilla/LookAndFeel.h"
+#include "mozilla/Services.h"
 #include "mozilla/WindowsVersion.h"
+#include "nsIObserverService.h"
+#include "nsIWidget.h"
 #include "nsLookAndFeel.h"
 #include "nsStringFwd.h"
 #include "nsWindowDbg.h"
@@ -140,6 +143,14 @@ static void OnSessionChange(WPARAM wParam, LPARAM lParam) {
 
     if (auto* wwot = WinWindowOcclusionTracker::Get()) {
       wwot->OnSessionChange(wParam);
+    }
+
+    if (nsCOMPtr<nsIObserverService> obs = services::GetObserverService()) {
+      obs->NotifyObservers(nullptr,
+                           wParam == WTS_SESSION_LOCK
+                               ? NS_WIDGET_SESSION_LOCK_OBSERVER_TOPIC
+                               : NS_WIDGET_SESSION_UNLOCK_OBSERVER_TOPIC,
+                           nullptr);
     }
   }
 }

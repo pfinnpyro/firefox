@@ -13,6 +13,7 @@
 #include "mozilla/StaticPrefs_security.h"
 #include "mozilla/SyncRunnable.h"
 #include "mozilla/dom/quota/IPCStreamCipherStrategy.h"
+#include "mozilla/security/lockstore/ProfileKek.h"
 #include "mozilla/security/lockstore/lockstore_ffi_generated.h"
 #include "ScopedNSSTypes.h"
 #include "nsAppDirectoryServiceDefs.h"
@@ -41,6 +42,8 @@ using mozilla::security::lockstore::keystore_close;
 using mozilla::security::lockstore::keystore_create_dek;
 using mozilla::security::lockstore::keystore_create_kek;
 using mozilla::security::lockstore::keystore_get_dek;
+using mozilla::security::lockstore::keystore_get_dek_automatic;
+using mozilla::security::lockstore::keystore_kek_exists;
 using mozilla::security::lockstore::keystore_open;
 using mozilla::security::lockstore::KeystoreHandle;
 
@@ -438,11 +441,24 @@ nsresult GetEncryptionKey(const nsACString& aDatabasePath, OpenIntent aIntent,
     // mints lockstore::kek::local:sqlite on first run and recovers it on
     // every later run, so we needn't persist the ref ourselves.
     if (sKekRef.IsEmpty()) {
-      const nsCString kekType("local"_ns);
-      const nsCString kekId("sqlite"_ns);
-      const nsCString empty;
-      rv = keystore_create_kek(sHandle, &kekType, &kekId, &empty,
-                               /* cache_timeout_ms */ 0, &sKekRef);
+      // Under Profile Lock (or the primary password link) new DEKs go under
+      // the profile password KEK, never under a LocalKey that unwraps without
+      // a secret.
+      const nsCString passwordKek(
+          mozilla::security::lockstore::kProfilePasswordKek);
+      bool passwordKekExists = false;
+      if (NS_SUCCEEDED(
+              keystore_kek_exists(sHandle, &passwordKek, &passwordKekExists)) &&
+          passwordKekExists) {
+        sKekRef = passwordKek;
+        rv = NS_OK;
+      } else {
+        const nsCString kekType("local"_ns);
+        const nsCString kekId("sqlite"_ns);
+        const nsCString empty;
+        rv = keystore_create_kek(sHandle, &kekType, &kekId, &empty,
+                                 /* cache_timeout_ms */ 0, &sKekRef);
+      }
       if (NS_FAILED(rv)) {
         sKekRef.Truncate();
         MOZ_LOG(GetSQLiteEncryptionLog(), LogLevel::Error,
@@ -452,7 +468,7 @@ nsresult GetEncryptionKey(const nsACString& aDatabasePath, OpenIntent aIntent,
       }
     }
 
-    rv = keystore_get_dek(sHandle, &collection, &sKekRef, &dek);
+    rv = keystore_get_dek_automatic(sHandle, &collection, &dek);
     if (rv == NS_ERROR_NOT_AVAILABLE && aIntent == OpenIntent::CreateIfNew) {
       if (sMarkerWriteFailed) {
         // The EncryptedDatabases marker could not be written, so the launch

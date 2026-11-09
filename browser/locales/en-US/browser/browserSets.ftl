@@ -218,6 +218,9 @@ search-tabs-shortcut =
 quit-app-shortcut =
     .key = Q
 
+lock-profile-shortcut =
+    .key = L
+
 preferences-shortcut =
     .key = ,
 

@@ -44,7 +44,7 @@ class nsToolkitProfile final
 
   nsToolkitProfile(const nsACString& aName, nsIFile* aRootDir,
                    nsIFile* aLocalDir, bool aFromDB, const nsACString& aStoreID,
-                   bool aShowProfileSelector);
+                   bool aShowProfileSelector, bool aRequiresUnlock);
 
   nsresult RemoveInternal(bool aRemoveFiles, bool aInBackground);
 
@@ -55,6 +55,7 @@ class nsToolkitProfile final
   nsCOMPtr<nsIFile> mLocalDir;
   nsCString mStoreID;
   bool mShowProfileSelector;
+  bool mRequiresUnlock;
   nsIProfileLock* mLock;
   uint32_t mIndex;
   nsCString mSection;
@@ -93,6 +94,9 @@ class nsToolkitProfileService final : public nsIToolkitProfileService {
   nsresult CreateResetProfile(nsIToolkitProfile** aNewProfile);
   nsresult ApplyResetProfile(nsIToolkitProfile* aOldProfile);
   bool HasShowProfileSelector();
+  // Whether any known profile is protected by Profile Lock, in which case the
+  // user must always pick a profile at startup.
+  bool HasProfileRequiringUnlock();
   void UpdateCurrentProfile();
   void CompleteStartup();
   const nsACString& ProfileSelectionReason();

@@ -31,6 +31,23 @@ function getFluentString(str) {
   return fluentStrings.formatValue(str);
 }
 
+function profileLabel(profile) {
+  return profile.requiresUnlock
+    ? gProfileManagerBundle.getFormattedString("profileLockedLabel", [
+        profile.name,
+      ])
+    : profile.name;
+}
+
+// Profile Lock always asks for a profile at startup, so the choice to skip
+// the profile manager does not apply while any profile is protected.
+function updateAutoSelectState() {
+  let anyProtected = Array.from(
+    gProfileService.profiles.entries(I.nsIToolkitProfile)
+  ).some(profile => profile.requiresUnlock);
+  document.getElementById("autoSelectLastProfile").disabled = anyProtected;
+}
+
 function startup() {
   try {
     gDialogParams = window.arguments[0].QueryInterface(I.nsIDialogParamBlock);
@@ -49,7 +66,7 @@ function startup() {
     var profilesElement = document.getElementById("profiles");
 
     for (let profile of gProfileService.profiles.entries(I.nsIToolkitProfile)) {
-      var listitem = profilesElement.appendItem(profile.name, "");
+      var listitem = profilesElement.appendItem(profileLabel(profile), "");
 
       var tooltiptext = gProfileManagerBundle.getFormattedString(
         "profileTooltip",
@@ -75,6 +92,7 @@ function startup() {
       "autoSelectLastProfile"
     );
     autoSelectLastProfile.checked = gProfileService.startWithLastProfile;
+    updateAutoSelectState();
     profilesElement.focus();
   } catch (e) {
     window.close();
@@ -269,7 +287,7 @@ function CreateProfileWizard() {
 function CreateProfile(aProfile) {
   var profilesElement = document.getElementById("profiles");
 
-  var listitem = profilesElement.appendItem(aProfile.name, "");
+  var listitem = profilesElement.appendItem(profileLabel(aProfile), "");
 
   var tooltiptext = gProfileManagerBundle.getFormattedString("profileTooltip", [
     aProfile.name,
@@ -280,6 +298,7 @@ function CreateProfile(aProfile) {
 
   profilesElement.ensureElementIsVisible(listitem);
   profilesElement.selectItem(listitem);
+  updateAutoSelectState();
 
   gNeedsFlush = true;
 }
@@ -327,7 +346,10 @@ function RenameProfile() {
       return false;
     }
 
-    selectedItem.firstChild.setAttribute("value", newName);
+    selectedItem.firstChild.setAttribute(
+      "value",
+      profileLabel(selectedProfile)
+    );
     var tiptext = gProfileManagerBundle.getFormattedString("profileTooltip", [
       newName,
       selectedProfile.rootDir.path,
@@ -421,6 +443,7 @@ async function ConfirmDelete() {
   if (profileList.firstChild != undefined) {
     profileList.selectItem(profileList.firstChild);
   }
+  updateAutoSelectState();
 
   return true;
 }

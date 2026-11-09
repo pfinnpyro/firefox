@@ -7,7 +7,8 @@ use, attempting to start a second instance of an application with the same profi
 profile in use error.
 
 This documentation covers the basic architecture of the profiles service. There is also specific
-documentation on [changes made to the service](./changes.md).
+documentation on [changes made to the service](./changes.md) and on
+[Profile Lock](./ProfileLock.md), which encrypts a profile and requires its password at startup.
 
 Two layered services are responsible for maintaining the set of known profiles that can be selected
 by users through a user interface and choosing a default profile at startup. It is also possible to
@@ -140,4 +141,5 @@ Selectable Profiles.
 :maxdepth: 1
 
 changes
+ProfileLock
 ```

@@ -1573,6 +1573,20 @@ pref("browser.sessionstore.resuming_after_os_restart", false);
 pref("browser.sessionstore.encryption.available", false);
 pref("browser.sessionstore.encryption.enabled", false);
 
+// Profile Lock (toolkit/profile/docs/ProfileLock.md). browser.profileLock.active
+// is forced on, locked, at startup for profiles whose protection.ini enables
+// the lock; the other prefs only matter while it is on.
+pref("browser.profileLock.active", false);
+// Close the profile after this many minutes without user input; 0 disables.
+pref("browser.profileLock.autoLockMinutes", 15);
+// Close the profile when the OS session is locked.
+pref("browser.profileLock.lockOnOSLock", true);
+// Close the profile when the computer goes to sleep.
+pref("browser.profileLock.lockOnSleep", true);
+// Clear history, cookies, site data, cache, form data and the open session
+// whenever the profile is locked.
+pref("browser.profileLock.clearOnLock", false);
+
 // Determines the behavior for opening new tab when users resume sessions
 pref("browser.sessionstore.newTabOnRestore", false);
 // Toggles the visibility of the newTabOnRestore setting in about:preferences

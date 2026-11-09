@@ -300,6 +300,7 @@ var gMainPane = {
     initSettingGroup("importBrowserData");
     initSettingGroup("tabs");
     initSettingGroup("profiles");
+    initSettingGroup("profileLock");
     initSettingGroup("profilePane");
 
     setEventListener("manageBrowserLanguagesButton", "command", function () {

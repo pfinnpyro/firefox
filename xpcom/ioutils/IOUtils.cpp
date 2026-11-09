@@ -2817,9 +2817,8 @@ Result<nsCString, nsresult> EnsureEncryptionKek(LockstoreService* aLockstore) {
   StaticMutexAutoLock lock(sEncryptionSetupMutex);
 
   if (!sEncryptionKekRef) {
-    auto result = aLockstore->DoCreateKek(kEncryptionKekType,
-                                          kEncryptionKekIdentifier, ""_ns,
-                                          /* cacheTimeoutMs */ 0);
+    auto result = aLockstore->DoResolveWrappingKek(kEncryptionKekType,
+                                                   kEncryptionKekIdentifier);
     if (result.isErr()) {
       return Err(result.unwrapErr());
     }

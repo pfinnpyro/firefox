@@ -21,6 +21,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/ProfileProtection.h"
 #include "mozilla/PreferenceSheet.h"
 #include "mozilla/Printf.h"
 #include "mozilla/ProcessType.h"
@@ -5881,8 +5882,11 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   if (wasDefaultSelection) {
     if (ShouldSkipProfileDialogForWebAuth()) {
       rv = NS_OK;
-    } else if (!mProfileSvc->GetStartWithLastProfile()) {
-      // First check the old style profile manager
+    } else if (!mProfileSvc->GetStartWithLastProfile() ||
+               mProfileSvc->HasProfileRequiringUnlock() ||
+               ReadProfileProtection(mProfD).mEnabled) {
+      // First check the old style profile manager. Profile Lock always
+      // requires an explicit choice of profile.
       rv = ShowProfileManager(profileSvc, nativeApp);
     } else if (profile && profile->GetShowProfileSelector()) {
       // Now check the new profile group selector
@@ -5911,6 +5915,13 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   }
   if (NS_FAILED(rv)) {
     return 1;
+  }
+
+  if (gDoProfileReset && ReadProfileProtection(mProfD).mEnabled) {
+    // A reset copies data out of the old profile into an unprotected one,
+    // which would both fail on encrypted stores and drop the protection.
+    NS_WARNING("Refusing to reset a profile protected by Profile Lock.");
+    gDoProfileReset = false;
   }
 
   if (gDoProfileReset) {
@@ -6015,8 +6026,13 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   if (!BackgroundTasks::IsBackgroundTaskMode())
 #endif
   {
+    // A Profile Lock profile always runs with encryption on, whatever the
+    // build-wide pref says; ApplyProfileProtectionPrefs forces the pref on
+    // before profile-do-change.
+    SetStartupProfileProtection(ReadProfileProtection(mProfD));
     bool prefEnabled =
-        StaticPrefs::security_storage_encryption_sqlite_enabled();
+        StaticPrefs::security_storage_encryption_sqlite_enabled() ||
+        GetStartupProfileProtection().mEnabled;
     EncryptionCompatResult ec =
         CheckEncryptionCompatibility(mProfD, prefEnabled);
     if (ec != EncryptionCompatResult::OK) {

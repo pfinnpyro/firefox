@@ -19,6 +19,7 @@ XPIDL_SOURCES += [
 
 MOZ_SRC_FILES += [
     "ProfileMetrics.sys.mjs",
+    "ProfileProtectionFile.sys.mjs",
     "ProfilesDatastoreService.sys.mjs",
 ]
 

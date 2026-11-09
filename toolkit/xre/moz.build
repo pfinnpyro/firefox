@@ -37,6 +37,7 @@ EXPORTS.mozilla += [
     "CmdLineAndEnvUtils.h",
     "GeckoArgs.h",
     "MultiInstanceLock.h",
+    "ProfileProtection.h",
     "SafeMode.h",
 ]
 
@@ -172,6 +173,7 @@ UNIFIED_SOURCES += [
     "nsNativeAppSupportBase.cpp",
     "nsSigHandlers.cpp",
     "nsXREDirProvider.cpp",
+    "ProfileProtection.cpp",
 ]
 
 # nsAppRunner.cpp and ProfileReset.cpp cannot be built in unified mode because

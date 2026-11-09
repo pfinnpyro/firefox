@@ -219,6 +219,37 @@ preferences-manage-profiles-button =
   .label = Manage Profiles
 preferences-profiles-settings-button =
   .label = Settings
+
+## Profile Lock. Only shown in a password-protected profile, whose data is
+## encrypted and which can only be opened by choosing it at startup and
+## entering its password. "Locking" closes the browser.
+
+preferences-profile-lock-header =
+    .label = Profile Lock
+    .description = This profile’s data is encrypted. Locking closes { -brand-short-name }, and the profile can only be opened again with its password.
+preferences-profile-lock-auto-lock =
+    .label = Lock automatically when idle
+preferences-profile-lock-never =
+    .label = Never
+# $minutes (Number) - Minutes without any keyboard or mouse input.
+preferences-profile-lock-after-minutes =
+    .label =
+        { $minutes ->
+            [one] After { $minutes } minute
+           *[other] After { $minutes } minutes
+        }
+preferences-profile-lock-on-os-lock =
+    .label = Lock when the computer’s screen is locked
+preferences-profile-lock-on-sleep =
+    .label = Lock when the computer goes to sleep
+preferences-profile-lock-clear-on-lock =
+    .label = Empty the profile when locking
+    .description = Closes all tabs and deletes history, downloads list, cookies, site data, cache and form data. Saved passwords, bookmarks and settings are kept.
+preferences-profile-lock-private-only =
+    .label = Only allow private browsing in this profile
+    .description = Takes effect the next time the profile is opened.
+preferences-profile-lock-now =
+    .label = Lock now
 # This string labels the entire copy profile section in the profiles sub-pane.
 preferences-copy-profile-header =
     .label = Copy an existing profile

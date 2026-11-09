@@ -55,6 +55,7 @@ DIRS += [
     "places",
     "preferences",
     "privatebrowsing",
+    "profilelock",
     "prompts",
     "protections",
     "protocolhandler",

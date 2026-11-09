@@ -49,6 +49,7 @@
 #include "mozilla/Services.h"
 #include "mozilla/Omnijar.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/ProfileProtection.h"
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/glean/ToolkitProfileMetrics.h"
 #include "mozilla/glean/ToolkitXreMetrics.h"
@@ -646,6 +647,10 @@ nsXREDirProvider::DoStartup() {
 #ifdef MOZ_BACKGROUNDTASKS
     isBackgroundTask = mozilla::BackgroundTasks::IsBackgroundTaskMode();
 #endif
+    if (XRE_IsParentProcess() && !isBackgroundTask) {
+      mozilla::ApplyProfileProtectionPrefs();
+    }
+
     // Ahead of profile-do-change, whose observers start opening profile
     // databases that cannot be read until the profile KEK is unlocked.
     if (XRE_IsParentProcess() && !isBackgroundTask &&

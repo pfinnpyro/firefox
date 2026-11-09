@@ -1,0 +1,7 @@
+[DEFAULT]
+head = ""
+firefox-appdir = "browser"
+
+["test_ProfileLock.js"]
+
+["test_ProfileProtectionFile.js"]

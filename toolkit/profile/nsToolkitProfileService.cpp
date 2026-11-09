@@ -282,12 +282,14 @@ nsresult WriteFile(nsIFile* aFile, const nsCString& aData) {
 nsToolkitProfile::nsToolkitProfile(const nsACString& aName, nsIFile* aRootDir,
                                    nsIFile* aLocalDir, bool aFromDB,
                                    const nsACString& aStoreID = VoidCString(),
-                                   bool aShowProfileSelector = false)
+                                   bool aShowProfileSelector = false,
+                                   bool aRequiresUnlock = false)
     : mName(aName),
       mRootDir(aRootDir),
       mLocalDir(aLocalDir),
       mStoreID(aStoreID),
       mShowProfileSelector(aShowProfileSelector),
+      mRequiresUnlock(aRequiresUnlock),
       mLock(nullptr),
       mIndex(0),
       mSection("Profile") {
@@ -464,6 +466,30 @@ nsToolkitProfile::SetName(const nsACString& aName) {
     nsToolkitProfileService::gService->mDevEditionDefault = this;
   }
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsToolkitProfile::GetRequiresUnlock(bool* aRequiresUnlock) {
+  *aRequiresUnlock = mRequiresUnlock;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsToolkitProfile::SetRequiresUnlock(bool aRequiresUnlock) {
+  NS_ASSERTION(nsToolkitProfileService::gService, "Where did my service go?");
+
+  if (mRequiresUnlock == aRequiresUnlock) {
+    return NS_OK;
+  }
+
+  nsINIParser* db = &nsToolkitProfileService::gService->mProfileDB;
+  nsresult rv = aRequiresUnlock
+                    ? db->SetString(mSection.get(), "RequiresUnlock", "1")
+                    : db->DeleteString(mSection.get(), "RequiresUnlock");
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mRequiresUnlock = aRequiresUnlock;
   return NS_OK;
 }
 
@@ -1213,8 +1239,15 @@ nsresult nsToolkitProfileService::Init() {
       }
     }
 
-    currentProfile = new nsToolkitProfile(name, rootDir, localDir, true,
-                                          storeID, showProfileSelector);
+    bool requiresUnlock = false;
+    rv = mProfileDB.GetString(profileID.get(), "RequiresUnlock", buffer);
+    if (NS_SUCCEEDED(rv)) {
+      requiresUnlock = buffer.EqualsLiteral("1");
+    }
+
+    currentProfile =
+        new nsToolkitProfile(name, rootDir, localDir, true, storeID,
+                             showProfileSelector, requiresUnlock);
 
     // If a user has modified the ini file path it may make for a valid profile
     // path but not match what we would have serialised and so may not match
@@ -2994,6 +3027,15 @@ nsToolkitProfileService::GetLocalDirFromRootDir(nsIFile* aRootDir,
 bool nsToolkitProfileService::HasShowProfileSelector() {
   for (RefPtr<nsToolkitProfile> profile : mProfiles) {
     if (profile->GetShowProfileSelector()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool nsToolkitProfileService::HasProfileRequiringUnlock() {
+  for (RefPtr<nsToolkitProfile> profile : mProfiles) {
+    if (profile->GetRequiresUnlock()) {
       return true;
     }
   }

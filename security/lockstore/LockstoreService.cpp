@@ -14,6 +14,7 @@
 #include "mozilla/Result.h"
 #include "mozilla/Services.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/security/lockstore/ProfileKek.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsCOMPtr.h"
 #include "nsDirectoryServiceUtils.h"
@@ -526,6 +527,17 @@ nsresult LockstoreService::DoChangeKekPassword(const nsACString& aKekRef,
 nsresult LockstoreService::DoDeleteKek(const nsACString& aKekRef) {
   LOCKSTORE_SYNC_PREAMBLE;
   return keystore_delete_kek(mKeystore, &aKekRef);
+}
+
+Result<nsCString, nsresult> LockstoreService::DoResolveWrappingKek(
+    const nsACString& aFallbackType, const nsACString& aFallbackIdentifier) {
+  bool passwordKekExists = false;
+  MOZ_TRY_VAR(passwordKekExists, DoKekExists(kProfilePasswordKek));
+  if (passwordKekExists) {
+    return nsCString(kProfilePasswordKek);
+  }
+  return DoCreateKek(aFallbackType, aFallbackIdentifier, ""_ns,
+                     /* cache_timeout_ms */ 0);
 }
 
 #undef LOCKSTORE_SYNC_PREAMBLE
