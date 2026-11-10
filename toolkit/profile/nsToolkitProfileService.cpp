@@ -2601,6 +2601,22 @@ nsresult WriteProfileInfo(nsIFile* profilesDBFile, nsIFile* installDBFile,
     changed = true;
   }
 
+  // Profile Lock: a protected profile group must keep requiring a choice of
+  // profile at startup, so this flag is merged like the ones above.
+  nsCString oldRequiresUnlock;
+  bool hasRequiresUnlock = NS_SUCCEEDED(profilesIni.GetString(
+      iniSection.get(), "RequiresUnlock", oldRequiresUnlock));
+  if (profileInfo->mRequiresUnlock &&
+      !(hasRequiresUnlock && oldRequiresUnlock.EqualsLiteral("1"))) {
+    rv = profilesIni.SetString(iniSection.get(), "RequiresUnlock", "1");
+    NS_ENSURE_SUCCESS(rv, rv);
+    changed = true;
+  } else if (!profileInfo->mRequiresUnlock && hasRequiresUnlock) {
+    rv = profilesIni.DeleteString(iniSection.get(), "RequiresUnlock");
+    NS_ENSURE_SUCCESS(rv, rv);
+    changed = true;
+  }
+
   profilesIni.GetString(iniSection.get(), "Path", oldValue);
   if (NS_FAILED(rv) || !oldValue.Equals(profileInfo->mPath)) {
     rv = profilesIni.SetString(iniSection.get(), "Path",
@@ -2684,6 +2700,7 @@ nsToolkitProfileService::AsyncFlushCurrentProfile(JSContext* aCx,
       std::make_unique<CurrentProfileData>();
   profileData->mStoreID = mCurrent->mStoreID;
   profileData->mShowSelector = mCurrent->mShowProfileSelector;
+  profileData->mRequiresUnlock = mCurrent->mRequiresUnlock;
 
   GetProfileDescriptor(mCurrent, &profileData->mIsRelative, profileData->mPath);
 

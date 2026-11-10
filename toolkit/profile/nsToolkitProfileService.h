@@ -23,6 +23,7 @@ struct CurrentProfileData {
   nsCString mStoreID;
   bool mShowSelector;
   bool mIsRelative;
+  bool mRequiresUnlock;
 };
 
 struct IniData {
