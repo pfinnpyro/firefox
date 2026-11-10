@@ -5,6 +5,8 @@
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  CustomizableUI:
+    "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
   SessionStore:
@@ -20,6 +22,7 @@ const PREF_LOCK_ON_SLEEP = "browser.profileLock.lockOnSleep";
 const PREF_CLEAR_ON_LOCK = "browser.profileLock.clearOnLock";
 
 const TOPIC_OS_LOCKED = "os-session-locked";
+const TOOLBAR_BUTTON_ID = "profile-lock-button";
 const TOPIC_SLEEP = "sleep_notification";
 
 // What "empty on lock" removes. Saved passwords, bookmarks and settings are
@@ -83,6 +86,23 @@ export const ProfileLock = {
     Services.obs.addObserver(this, TOPIC_SLEEP);
     Services.prefs.addObserver(PREF_AUTO_LOCK_MINUTES, this);
     this._updateIdleObserver();
+    this._createToolbarButton();
+  },
+
+  _createToolbarButton() {
+    if (
+      lazy.CustomizableUI.getWidget(TOOLBAR_BUTTON_ID)?.provider ==
+      lazy.CustomizableUI.PROVIDER_API
+    ) {
+      return;
+    }
+    lazy.CustomizableUI.createWidget({
+      id: TOOLBAR_BUTTON_ID,
+      l10nId: "profile-lock-toolbar-button",
+      shortcutId: "key_lockProfile",
+      defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
+      onCommand: () => this.lock("user"),
+    });
   },
 
   uninit() {

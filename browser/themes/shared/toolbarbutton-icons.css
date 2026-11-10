@@ -93,6 +93,10 @@ toolbar .toolbarbutton-1 {
   list-style-image: url("chrome://browser/skin/screenshot.svg");
 }
 
+#profile-lock-button {
+  list-style-image: url("chrome://browser/skin/profile-lock.svg");
+}
+
 #save-page-button {
   list-style-image: url("chrome://browser/skin/save.svg");
 }

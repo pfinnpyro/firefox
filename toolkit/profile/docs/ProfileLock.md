@@ -208,12 +208,16 @@ gone. Reopening goes through the profile manager and password prompt again.
 | No input for N minutes | `nsIUserIdleService` idle observer | 15 minutes (`browser.profileLock.autoLockMinutes`, 0 = off) |
 | OS screen lock | `os-session-locked` observer topic | on (`browser.profileLock.lockOnOSLock`) |
 | Sleep | `sleep_notification` | on (`browser.profileLock.lockOnSleep`) |
-| User | File ▸ Lock Profile, Ctrl/Cmd+Shift+L, or the Lock now button in settings | always available |
+| User | the open-padlock toolbar button, File ▸ Lock Profile, Ctrl/Cmd+Shift+L, or Lock now in settings | always available |
 
 The `os-session-locked` / `os-session-unlocked` topics are new and come from:
 
 - Windows: `WM_WTSSESSION_CHANGE` (`WTS_SESSION_LOCK`) for the current
-  session, in `widget/windows/WinEventObserver.cpp`.
+  session, received by the hidden event window in
+  `widget/windows/WinEventObserver.cpp`, which registers for it with
+  `WTSRegisterSessionNotification`. The same window registers with
+  `RegisterSuspendResumeNotification`, so that `sleep_notification` also fires
+  on Modern Standby systems, where `PBT_APMSUSPEND` is not broadcast.
 - Linux: logind `org.freedesktop.login1.Session` `Lock` / `Unlock` on the
   process's own session, plus `ActiveChanged` from `org.freedesktop.ScreenSaver`
   and `org.gnome.ScreenSaver` on the session bus, in `widget/gtk/nsAppShell.cpp`.
@@ -237,7 +241,7 @@ browsing) on as a locked pref for that profile. Private browsing keeps
 history, cookies and site data in memory. Combined with Profile Lock, what
 remains on disk is the profile's settings, bookmarks, saved passwords and
 extensions, all of which are encrypted where covered below. The setting is in
-the new-profile wizard and in Settings ▸ General ▸ Profile Lock. A change takes
+the new-profile wizard and in Settings ▸ Privacy and security ▸ Profile Lock. A change takes
 effect the next time the profile opens.
 
 ## Data inventory

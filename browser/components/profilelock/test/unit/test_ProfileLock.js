@@ -36,6 +36,7 @@ function reset() {
 
 add_setup(() => {
   ProfileLock._quit = () => gQuits++;
+  ProfileLock._createToolbarButton = () => {};
   Object.defineProperty(ProfileLock, "idleService", {
     get: fakeIdleService,
     configurable: true,

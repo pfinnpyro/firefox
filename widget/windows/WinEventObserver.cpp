@@ -28,6 +28,7 @@
 #include "nsIWidget.h"
 #include "nsLookAndFeel.h"
 #include "nsStringFwd.h"
+#include "nsWindow.h"
 #include "nsWindowDbg.h"
 #include "nsXULAppAPI.h"
 #include "nsdefs.h"
@@ -48,6 +49,7 @@ namespace evtwin_details {
 static HWND sHiddenWindow = nullptr;
 static bool sHiddenWindowShutdown = false;
 HDEVNOTIFY sDeviceNotifyHandle = nullptr;
+HPOWERNOTIFY sSuspendResumeNotifyHandle = nullptr;
 }  // namespace evtwin_details
 }  // namespace
 
@@ -84,10 +86,26 @@ void WinEventWindow::Ensure() {
 
   sDeviceNotifyHandle = InputDeviceUtils::RegisterNotification(sHiddenWindow);
 
+  // Session lock/unlock (WM_WTSSESSION_CHANGE) only reaches registered
+  // windows. Suspend and resume (PBT_APMSUSPEND) are only broadcast on systems
+  // with classic S3 sleep; Modern Standby systems need an explicit
+  // registration to hear about them.
+  if (!::WTSRegisterSessionNotification(sHiddenWindow,
+                                        NOTIFY_FOR_THIS_SESSION)) {
+    OBS_LOG("WTSRegisterSessionNotification failed: %lu", ::GetLastError());
+  }
+  sSuspendResumeNotifyHandle = ::RegisterSuspendResumeNotification(
+      sHiddenWindow, DEVICE_NOTIFY_WINDOW_HANDLE);
+
   // It should be harmless to leak this window until destruction -- but other
   // parts of Gecko may expect all windows to be destroyed, so do that.
   mozilla::RunOnShutdown([]() {
     InputDeviceUtils::UnregisterNotification(sDeviceNotifyHandle);
+    if (sSuspendResumeNotifyHandle) {
+      ::UnregisterSuspendResumeNotification(sSuspendResumeNotifyHandle);
+      sSuspendResumeNotifyHandle = nullptr;
+    }
+    ::WTSUnRegisterSessionNotification(sHiddenWindow);
 
     sHiddenWindowShutdown = true;
     ::DestroyWindow(sHiddenWindow);
@@ -156,6 +174,16 @@ static void OnSessionChange(WPARAM wParam, LPARAM lParam) {
 }
 
 static void OnPowerBroadcast(WPARAM wParam, LPARAM lParam) {
+  switch (wParam) {
+    case PBT_APMSUSPEND:
+      nsWindow::PostSleepWakeNotification(true);
+      return;
+    case PBT_APMRESUMEAUTOMATIC:
+    case PBT_APMRESUMESUSPEND:
+      nsWindow::PostSleepWakeNotification(false);
+      return;
+  }
+
   if (wParam == PBT_POWERSETTINGCHANGE) {
     POWERBROADCAST_SETTING* setting = (POWERBROADCAST_SETTING*)lParam;
     MOZ_ASSERT(setting);
