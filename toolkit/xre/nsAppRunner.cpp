@@ -3213,6 +3213,24 @@ static bool ShouldSkipProfileDialogForWebAuth() {
 #endif
 }
 
+// Whether aProfile belongs to a group of selectable profiles.
+static bool IsInProfileGroup(nsIToolkitProfile* aProfile) {
+#ifdef MOZ_SELECTABLE_PROFILES
+  nsCString storeID;
+  return aProfile && NS_SUCCEEDED(aProfile->GetStoreID(storeID)) &&
+         !storeID.IsVoid();
+#else
+  return false;
+#endif
+}
+
+// Profile Lock: whether the user must choose a profile before any opens.
+static bool IsProfileChoiceRequired(nsToolkitProfileService* aProfileSvc,
+                                    nsIFile* aProfileDir) {
+  return aProfileSvc->HasProfileRequiringUnlock() ||
+         ReadProfileProtection(aProfileDir).mEnabled;
+}
+
 static bool gDoMigration = false;
 static bool gDoProfileReset = false;
 constinit static nsCOMPtr<nsIToolkitProfile> gResetOldProfile;
@@ -5882,11 +5900,14 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   if (wasDefaultSelection) {
     if (ShouldSkipProfileDialogForWebAuth()) {
       rv = NS_OK;
-    } else if (!mProfileSvc->GetStartWithLastProfile() ||
-               mProfileSvc->HasProfileRequiringUnlock() ||
-               ReadProfileProtection(mProfD).mEnabled) {
-      // First check the old style profile manager. Profile Lock always
-      // requires an explicit choice of profile.
+    } else if (IsProfileChoiceRequired(mProfileSvc, mProfD)) {
+      // Profile Lock always requires an explicit choice of profile. A profile
+      // group uses its own selector, which lists the profiles of the group.
+      rv = IsInProfileGroup(profile)
+               ? ShowProfileSelector(profileSvc, nativeApp)
+               : ShowProfileManager(profileSvc, nativeApp);
+    } else if (!mProfileSvc->GetStartWithLastProfile()) {
+      // First check the old style profile manager
       rv = ShowProfileManager(profileSvc, nativeApp);
     } else if (profile && profile->GetShowProfileSelector()) {
       // Now check the new profile group selector

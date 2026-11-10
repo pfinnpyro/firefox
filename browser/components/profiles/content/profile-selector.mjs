@@ -21,6 +21,7 @@ export class ProfileSelector extends MozLitElement {
   static properties = {
     profiles: { type: Array },
     showSelector: { type: Boolean },
+    lockRequired: { type: Boolean },
   };
 
   static queries = {
@@ -96,6 +97,9 @@ export class ProfileSelector extends MozLitElement {
     this.profiles = await this.selectableProfileService.getAllProfiles();
     this.showSelector =
       this.selectableProfileService.groupToolkitProfile.showProfileSelector;
+    // Profile Lock shows this window at every startup whatever the checkbox.
+    this.lockRequired =
+      !!this.selectableProfileService.groupToolkitProfile.requiresUnlock;
 
     if (!this.profiles.length) {
       await this.selectableProfileService.setShowProfileSelectorWindow(false);
@@ -187,12 +191,13 @@ export class ProfileSelector extends MozLitElement {
       <moz-checkbox
         @click=${this.handleCheckboxToggle}
         data-l10n-id="profile-window-checkbox-label-2"
-        ?checked=${this.showSelector}
+        ?checked=${this.showSelector || this.lockRequired}
+        ?disabled=${this.lockRequired}
       >
         <span
           slot="description"
           data-l10n-id="profile-window-checkbox-subcopy"
-          ?hidden=${this.showSelector}
+          ?hidden=${this.showSelector || this.lockRequired}
         ></span>
       </moz-checkbox>`;
   }

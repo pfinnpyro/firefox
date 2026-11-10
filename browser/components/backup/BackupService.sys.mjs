@@ -3912,7 +3912,9 @@ export class BackupService extends EventTarget {
           false,
           existingProfilePath,
           // This is transient and will be overwritten when times.json is copied over.
-          "backup"
+          "backup",
+          // A restore copies unencrypted data in, which Profile Lock refuses.
+          { protect: false }
         );
       } catch (e) {
         throw e instanceof BackupError

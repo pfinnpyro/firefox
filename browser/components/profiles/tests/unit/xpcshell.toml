@@ -19,6 +19,8 @@ run-sequentially = ["os == 'mac'"] # frequent fail in parallel on Mac
 
 ["test_create_profile.js"]
 
+["test_create_protected_profile.js"]
+
 ["test_datastore_uninit_during_init.js"]
 
 ["test_delete_last_profile.js"]

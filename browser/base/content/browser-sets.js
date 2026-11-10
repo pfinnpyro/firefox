@@ -291,6 +291,7 @@ document.addEventListener(
             break;
           // deliberate fallthrough
           case "Profiles:CreateProfile":
+          case "Profiles:CreateProtectedProfile":
           case "Profiles:ManageProfiles":
           case "Profiles:LaunchProfile":
           case "Profiles:MoveTabsToProfile":

@@ -26,6 +26,11 @@ profile-card-delete-button =
 profile-card =
     .title = Open { $profileName }
     .aria-label = Open { $profileName }
+# Badge on a profile protected by Profile Lock: its data is encrypted and it
+# needs a password to open.
+profile-card-protected =
+    .alt = Protected with a password
+    .title = Protected with a password
 
 # Variables
 #   $number (number) - The number of the profile

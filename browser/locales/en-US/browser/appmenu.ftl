@@ -477,6 +477,13 @@ appmenu-copy-profile =
     .label = Copy This Profile
 appmenu-create-profile2 =
     .label = Create a New Profile
+# A profile whose data is encrypted and which needs a password to open
+# (Profile Lock).
+appmenu-create-protected-profile =
+    .label = Create a New Protected Profile
+# Variables:
+#   $profileName (String): The name of a profile protected by Profile Lock.
+appmenu-profile-protected-tooltip = { $profileName } is protected with a password
 appmenu-edit-profile =
     .aria-label = Edit profile
 appmenu-edit-this-profile =

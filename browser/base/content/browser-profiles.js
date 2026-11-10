@@ -207,6 +207,7 @@ var gProfiles = {
       btn.style.setProperty("--appmenu-profiles-theme-fg", themeFg);
       let avatarURL = await profile.getAvatarURL(16);
       btn.setAttribute("image", avatarURL);
+      await this.markIfProtected(btn, profile);
       container.appendChild(btn);
     }
 
@@ -294,6 +295,7 @@ var gProfiles = {
         btn.setAttribute("label", profile.name);
         btn.setAttribute("image", await profile.getAvatarURL(16));
       }
+      await this.markIfProtected(btn, profile);
 
       list.appendChild(btn);
     }
@@ -307,6 +309,8 @@ var gProfiles = {
     let profiles = await SelectableProfileService.getAllProfiles();
     let currentProfile = SelectableProfileService.currentProfile;
     let insertionPoint = document.getElementById("menu_newProfile");
+    document.getElementById("menu_newProtectedProfile").hidden =
+      SelectableProfileService.newProfilesProtected;
     let existingItems = [
       ...menuPopup.querySelectorAll(":scope > menuitem[profileid]"),
     ];
@@ -366,8 +370,31 @@ var gProfiles = {
     });
   },
 
-  createNewProfile(source) {
-    SelectableProfileService.createNewProfile(true, null, source);
+  /**
+   * Badge a profile list entry when the profile is protected by Profile Lock.
+   *
+   * @param {Element} element
+   * @param {SelectableProfile} profile
+   */
+  async markIfProtected(element, profile) {
+    if (!(await SelectableProfileService.isProfileProtected(profile))) {
+      return;
+    }
+    element.classList.add("profile-item-protected");
+    element.setAttribute(
+      "tooltiptext",
+      await document.l10n.formatValue("appmenu-profile-protected-tooltip", {
+        profileName: profile.name,
+      })
+    );
+  },
+
+  /**
+   * @param {string} source
+   * @param {object} [options] Passed to SelectableProfileService.createNewProfile.
+   */
+  createNewProfile(source, options = {}) {
+    SelectableProfileService.createNewProfile(true, null, source, options);
   },
 
   updateView(target) {
@@ -518,10 +545,18 @@ var gProfiles = {
         this.createNewProfile("profiles-panel");
         break;
       }
+      case "profiles-create-protected-profile-button": {
+        this.createNewProfile("profiles-panel", { protect: true });
+        break;
+      }
 
       /* Menubar events */
       case "Profiles:CreateProfile": {
         this.createNewProfile("main-menu");
+        break;
+      }
+      case "Profiles:CreateProtectedProfile": {
+        this.createNewProfile("main-menu", { protect: true });
         break;
       }
       case "Profiles:ManageProfiles": {
@@ -648,6 +683,28 @@ var gProfiles = {
       );
     }
 
+    let createProtectedProfileButton = PanelMultiView.getViewNode(
+      document,
+      "profiles-create-protected-profile-button"
+    );
+    if (!createProtectedProfileButton) {
+      createProtectedProfileButton = document.createXULElement("toolbarbutton");
+      createProtectedProfileButton.id =
+        "profiles-create-protected-profile-button";
+      createProtectedProfileButton.classList.add(
+        "subviewbutton",
+        "panel-subview-footer-button"
+      );
+      createProtectedProfileButton.setAttribute(
+        "data-l10n-id",
+        "appmenu-create-protected-profile"
+      );
+    }
+    // When new profiles are protected anyway, the plain button already makes
+    // a protected one.
+    createProtectedProfileButton.hidden =
+      SelectableProfileService.newProfilesProtected;
+
     let copyProfileButton = PanelMultiView.getViewNode(
       document,
       "profiles-copy-profile-button"
@@ -764,6 +821,7 @@ var gProfiles = {
           btn.style.setProperty("--appmenu-profiles-theme-bg", themeBg);
           btn.style.setProperty("--appmenu-profiles-theme-fg", themeFg);
           btn.setAttribute("image", await profile.getAvatarURL(16));
+          await this.markIfProtected(btn, profile);
           profilesList.appendChild(btn);
           hasOtherProfiles = true;
         }
@@ -779,12 +837,14 @@ var gProfiles = {
 
       subview.appendChild(manageProfilesButton);
       subview.appendChild(createProfileButton);
+      subview.appendChild(createProtectedProfileButton);
     } else {
       headerSeparator.hidden = false;
       footerSeparator.hidden = true;
       editThisProfileButton.hidden = true;
       subview.insertBefore(editThisProfileButton, subviewBody);
       subview.insertBefore(createProfileButton, subviewBody);
+      subview.insertBefore(createProtectedProfileButton, subviewBody);
       subview.insertBefore(copyProfileButton, subviewBody);
       subview.insertBefore(manageProfilesButton, subviewBody);
     }

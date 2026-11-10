@@ -244,6 +244,35 @@ extensions, all of which are encrypted where covered below. The setting is in
 the new-profile wizard and in Settings ▸ Privacy and security ▸ Profile Lock. A change takes
 effect the next time the profile opens.
 
+## Profile groups
+
+Firefox's profile switcher (`SelectableProfileService`, the Profiles section
+of the account and app menus, and `about:profilemanager`) manages a group of
+profiles that share one entry in `profiles.ini`. Profile Lock fits in as
+follows:
+
+- **Creating.** `SelectableProfileService.createNewProfile` takes
+  `{ protect, privateOnly }` and writes `protection.ini` into the new profile
+  before it first starts. `protect` defaults to `newProfilesProtected`, which
+  is true when the running profile is protected or the group already holds a
+  protected profile, so a protected group only grows protected profiles. The
+  Profiles panel and the Profiles menu also offer "New protected profile"
+  from an unprotected profile. A backup restore opts out explicitly, since it
+  copies unencrypted data into the new profile.
+- **Startup.** Creating a protected profile, or starting one, sets
+  `RequiresUnlock` on the group's `profiles.ini` entry. Startup then always
+  shows the group's selector (`about:profilemanager`) rather than opening the
+  last used profile, and the "show when starting" checkbox there is forced on.
+  Profiles outside any group keep using the old profile manager.
+- **Showing.** Protected profiles carry a padlock in the switcher menus and
+  on their card in the selector.
+- **Switching.** The switcher opens another profile in a new process with
+  `--profile`, which goes through the same password prompt as any other
+  start.
+
+The group's shared database, which holds profile names, avatars and themes,
+lives outside every profile and is not encrypted.
+
 ## Data inventory
 
 What a protected profile stores, and whether it is encrypted. "Covered" means
@@ -328,10 +357,10 @@ of value:
    or hardware-backed KEK (Windows Hello / TPM, macOS Keychain / Secure
    Enclave, PKCS#11 smart cards, already supported by lockstore) as a second
    factor next to the password.
-5. **Profile manager integration.** Unlock in the profile manager itself
-   instead of a prompt after it, show lock state in the new profile selector
-   (`about:profilemanager`) for selectable profiles, and an enterprise policy
-   that requires every profile to be protected.
+5. **Profile manager integration.** Unlock in the profile selector itself
+   instead of a prompt after it, encrypt or minimise the profile group's
+   shared database, and an enterprise policy that requires every profile to
+   be protected.
 6. **Telemetry-free audit trail.** Record unlock failures and lock events in
    the encrypted profile for the owner to review.
 
@@ -342,6 +371,8 @@ of value:
   profile.
 - `toolkit/profile/test/xpcshell/test_requires_unlock.js`: `RequiresUnlock`
   round-trips through `profiles.ini`, including section renumbering.
+- `browser/components/profiles/tests/unit/test_create_protected_profile.js`:
+  protected profiles in a profile group, inheritance and the group flag.
 - `browser/components/profilelock/test/unit/`: lock triggers (idle, screen
   lock, sleep, prefs) and the `protection.ini` reader and writer.
 - End to end, under Xvfb on Linux: a new protected profile asks for a new

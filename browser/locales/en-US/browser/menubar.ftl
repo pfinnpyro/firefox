@@ -287,6 +287,10 @@ menu-profiles-manage-profiles =
     .label = Manage Profiles
 menu-profiles-new-profile =
     .label = New Profile
+# A profile whose data is encrypted and which needs a password to open
+# (Profile Lock).
+menu-profiles-new-protected-profile =
+    .label = New Protected Profile
 # Variables:
 #  $profileName (String): the name of the users profile
 menu-profiles-current =
