@@ -282,12 +282,14 @@ nsresult WriteFile(nsIFile* aFile, const nsCString& aData) {
 nsToolkitProfile::nsToolkitProfile(const nsACString& aName, nsIFile* aRootDir,
                                    nsIFile* aLocalDir, bool aFromDB,
                                    const nsACString& aStoreID = VoidCString(),
-                                   bool aShowProfileSelector = false)
+                                   bool aShowProfileSelector = false,
+                                   bool aRequiresUnlock = false)
     : mName(aName),
       mRootDir(aRootDir),
       mLocalDir(aLocalDir),
       mStoreID(aStoreID),
       mShowProfileSelector(aShowProfileSelector),
+      mRequiresUnlock(aRequiresUnlock),
       mLock(nullptr),
       mIndex(0),
       mSection("Profile") {
@@ -464,6 +466,30 @@ nsToolkitProfile::SetName(const nsACString& aName) {
     nsToolkitProfileService::gService->mDevEditionDefault = this;
   }
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsToolkitProfile::GetRequiresUnlock(bool* aRequiresUnlock) {
+  *aRequiresUnlock = mRequiresUnlock;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsToolkitProfile::SetRequiresUnlock(bool aRequiresUnlock) {
+  NS_ASSERTION(nsToolkitProfileService::gService, "Where did my service go?");
+
+  if (mRequiresUnlock == aRequiresUnlock) {
+    return NS_OK;
+  }
+
+  nsINIParser* db = &nsToolkitProfileService::gService->mProfileDB;
+  nsresult rv = aRequiresUnlock
+                    ? db->SetString(mSection.get(), "RequiresUnlock", "1")
+                    : db->DeleteString(mSection.get(), "RequiresUnlock");
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mRequiresUnlock = aRequiresUnlock;
   return NS_OK;
 }
 
@@ -1213,8 +1239,15 @@ nsresult nsToolkitProfileService::Init() {
       }
     }
 
-    currentProfile = new nsToolkitProfile(name, rootDir, localDir, true,
-                                          storeID, showProfileSelector);
+    bool requiresUnlock = false;
+    rv = mProfileDB.GetString(profileID.get(), "RequiresUnlock", buffer);
+    if (NS_SUCCEEDED(rv)) {
+      requiresUnlock = buffer.EqualsLiteral("1");
+    }
+
+    currentProfile =
+        new nsToolkitProfile(name, rootDir, localDir, true, storeID,
+                             showProfileSelector, requiresUnlock);
 
     // If a user has modified the ini file path it may make for a valid profile
     // path but not match what we would have serialised and so may not match
@@ -2568,6 +2601,22 @@ nsresult WriteProfileInfo(nsIFile* profilesDBFile, nsIFile* installDBFile,
     changed = true;
   }
 
+  // Profile Lock: a protected profile group must keep requiring a choice of
+  // profile at startup, so this flag is merged like the ones above.
+  nsCString oldRequiresUnlock;
+  bool hasRequiresUnlock = NS_SUCCEEDED(profilesIni.GetString(
+      iniSection.get(), "RequiresUnlock", oldRequiresUnlock));
+  if (profileInfo->mRequiresUnlock &&
+      !(hasRequiresUnlock && oldRequiresUnlock.EqualsLiteral("1"))) {
+    rv = profilesIni.SetString(iniSection.get(), "RequiresUnlock", "1");
+    NS_ENSURE_SUCCESS(rv, rv);
+    changed = true;
+  } else if (!profileInfo->mRequiresUnlock && hasRequiresUnlock) {
+    rv = profilesIni.DeleteString(iniSection.get(), "RequiresUnlock");
+    NS_ENSURE_SUCCESS(rv, rv);
+    changed = true;
+  }
+
   profilesIni.GetString(iniSection.get(), "Path", oldValue);
   if (NS_FAILED(rv) || !oldValue.Equals(profileInfo->mPath)) {
     rv = profilesIni.SetString(iniSection.get(), "Path",
@@ -2651,6 +2700,7 @@ nsToolkitProfileService::AsyncFlushCurrentProfile(JSContext* aCx,
       std::make_unique<CurrentProfileData>();
   profileData->mStoreID = mCurrent->mStoreID;
   profileData->mShowSelector = mCurrent->mShowProfileSelector;
+  profileData->mRequiresUnlock = mCurrent->mRequiresUnlock;
 
   GetProfileDescriptor(mCurrent, &profileData->mIsRelative, profileData->mPath);
 
@@ -2994,6 +3044,15 @@ nsToolkitProfileService::GetLocalDirFromRootDir(nsIFile* aRootDir,
 bool nsToolkitProfileService::HasShowProfileSelector() {
   for (RefPtr<nsToolkitProfile> profile : mProfiles) {
     if (profile->GetShowProfileSelector()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool nsToolkitProfileService::HasProfileRequiringUnlock() {
+  for (RefPtr<nsToolkitProfile> profile : mProfiles) {
+    if (profile->GetRequiresUnlock()) {
       return true;
     }
   }

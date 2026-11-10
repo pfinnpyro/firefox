@@ -33,6 +33,11 @@ var gRemovePasswordDialog = {
 
   async removePassword(event) {
     event.preventDefault();
+    // Profile Lock keeps the profile encrypted under the primary password.
+    if (Services.prefs.getBoolPref("browser.profileLock.active", false)) {
+      window.close();
+      return;
+    }
     let kekMoved = false;
     try {
       // Migrate the lockstore KEK first: if it fails the primary password is

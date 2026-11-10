@@ -503,7 +503,115 @@ if (SECURITY_PRIVACY_STATUS_CARD_ENABLED) {
   ]);
 }
 
+const { ProfileLock } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/profilelock/ProfileLock.sys.mjs"
+);
+const { readProfileProtection, writeProfileProtection } =
+  ChromeUtils.importESModule(
+    "moz-src:///toolkit/profile/ProfileProtectionFile.sys.mjs"
+  );
+
+// Profile Lock: only offered in a profile that startup opened with its
+// password (see toolkit/profile/docs/ProfileLock.md).
+const PROFILE_LOCK_ACTIVE = Services.prefs.getBoolPref(
+  "browser.profileLock.active",
+  false
+);
+const PROFILE_LOCK_MINUTES = [0, 5, 15, 30, 60];
+
+Preferences.addAll([
+  { id: "browser.profileLock.autoLockMinutes", type: "int" },
+  { id: "browser.profileLock.lockOnOSLock", type: "bool" },
+  { id: "browser.profileLock.lockOnSleep", type: "bool" },
+  { id: "browser.profileLock.clearOnLock", type: "bool" },
+]);
+
+Preferences.addSetting({
+  id: "profileLockAutoLock",
+  pref: "browser.profileLock.autoLockMinutes",
+  get: prefVal => String(prefVal),
+  set: value => parseInt(value, 10),
+  getControlConfig(config) {
+    return {
+      ...config,
+      options: PROFILE_LOCK_MINUTES.map(minutes => ({
+        value: String(minutes),
+        l10nId: minutes
+          ? "preferences-profile-lock-after-minutes"
+          : "preferences-profile-lock-never",
+        l10nArgs: { minutes },
+      })),
+    };
+  },
+});
+Preferences.addSetting({
+  id: "profileLockOnOSLock",
+  pref: "browser.profileLock.lockOnOSLock",
+});
+Preferences.addSetting({
+  id: "profileLockOnSleep",
+  pref: "browser.profileLock.lockOnSleep",
+});
+Preferences.addSetting({
+  id: "profileLockClearOnLock",
+  pref: "browser.profileLock.clearOnLock",
+});
+Preferences.addSetting({
+  id: "profileLockPrivateOnly",
+  get() {
+    return readProfileProtection(Services.dirsvc.get("ProfD", Ci.nsIFile))
+      .privateOnly;
+  },
+  set(privateOnly) {
+    // Applied by startup, before any window opens, so it takes a restart.
+    writeProfileProtection(Services.dirsvc.get("ProfD", Ci.nsIFile), {
+      privateOnly,
+    });
+    return privateOnly;
+  },
+});
+Preferences.addSetting({
+  id: "profileLockNow",
+  onUserClick: () => {
+    ProfileLock.lock("user");
+  },
+});
+
 SettingGroupManager.registerGroups({
+  profileLock: {
+    id: "profileLockGroup",
+    l10nId: "preferences-profile-lock-header",
+    headingLevel: 2,
+    hidden: !PROFILE_LOCK_ACTIVE,
+    items: [
+      {
+        id: "profileLockAutoLock",
+        l10nId: "preferences-profile-lock-auto-lock",
+        control: "moz-select",
+      },
+      {
+        id: "profileLockOnOSLock",
+        l10nId: "preferences-profile-lock-on-os-lock",
+      },
+      {
+        id: "profileLockOnSleep",
+        l10nId: "preferences-profile-lock-on-sleep",
+      },
+      {
+        id: "profileLockClearOnLock",
+        l10nId: "preferences-profile-lock-clear-on-lock",
+      },
+      {
+        id: "profileLockPrivateOnly",
+        l10nId: "preferences-profile-lock-private-only",
+      },
+      {
+        id: "profileLockNow",
+        l10nId: "preferences-profile-lock-now",
+        control: "moz-box-button",
+      },
+    ],
+  },
   httpsOnly: {
     l10nId: "httpsonly-group",
     supportPage: "https-only-prefs",

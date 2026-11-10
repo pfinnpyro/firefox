@@ -202,8 +202,9 @@ already_AddRefed<CacheCrypto> CacheCrypto::LoadFromKeystore(
   MOZ_ASSERT(!NS_IsMainThread());
 
   // A non-empty identifier makes this a deterministic get-or-create, so the
-  // kekRef does not have to be persisted anywhere.
-  auto kekRef = aLockstore->DoCreateKek("local"_ns, kKekIdentifier, ""_ns, 0);
+  // kekRef does not have to be persisted anywhere. A profile password KEK, when
+  // there is one, takes precedence so the DEK is never left under a LocalKey.
+  auto kekRef = aLockstore->DoResolveWrappingKek("local"_ns, kKekIdentifier);
   if (kekRef.isErr()) {
     LOG(
         ("CacheCrypto::LoadFromKeystore() - could not obtain the KEK "

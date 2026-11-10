@@ -35,6 +35,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   TelemetryUtils: "resource://gre/modules/TelemetryUtils.sys.mjs",
   PushNotificationHelper:
     "resource://gre/modules/PushNotificationHelper.sys.mjs",
+  readProfileProtection:
+    "moz-src:///toolkit/profile/ProfileProtectionFile.sys.mjs",
+  writeProfileProtection:
+    "moz-src:///toolkit/profile/ProfileProtectionFile.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "profilesLocalization", () => {
@@ -522,6 +526,47 @@ class SelectableProfileServiceClass extends EventEmitter {
     return this.#profileService.currentProfile;
   }
 
+  /**
+   * Whether profiles created now should be protected by Profile Lock by
+   * default: they are whenever the running profile is, or any profile in the
+   * group is (see toolkit/profile/docs/ProfileLock.md).
+   *
+   * @returns {boolean}
+   */
+  get newProfilesProtected() {
+    return (
+      Services.prefs.getBoolPref("browser.profileLock.active", false) ||
+      !!this.groupToolkitProfile?.requiresUnlock
+    );
+  }
+
+  /**
+   * Whether a profile of the group is protected by Profile Lock.
+   *
+   * @param {SelectableProfile} aProfile
+   * @returns {Promise<boolean>}
+   */
+  async isProfileProtected(aProfile) {
+    try {
+      return lazy.readProfileProtection(await aProfile.rootDir).enabled;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Make startup always ask which profile of the group to open, as it must
+   * while any profile of the group is protected by Profile Lock.
+   */
+  async markGroupRequiresUnlock() {
+    let groupProfile = this.groupToolkitProfile;
+    if (!groupProfile || groupProfile.requiresUnlock) {
+      return;
+    }
+    groupProfile.requiresUnlock = true;
+    await this.#attemptFlushProfileService();
+  }
+
   get currentProfile() {
     return this.#currentProfile;
   }
@@ -691,6 +736,11 @@ class SelectableProfileServiceClass extends EventEmitter {
       async () => this.setDefaultProfileForGroup(),
       500
     );
+
+    // A protected profile makes its whole group ask for a profile at startup.
+    if (Services.prefs.getBoolPref("browser.profileLock.active", false)) {
+      await this.markGroupRequiresUnlock();
+    }
 
     // The 'activate' event listeners use #currentProfile, so this line has
     // to come after #currentProfile has been set.
@@ -1902,17 +1952,29 @@ class SelectableProfileServiceClass extends EventEmitter {
    * @param {nsIFile} [existingProfilePath=null] Optional path to use for the
    * profile instead of creating new directories in the default location.
    * @param {string} source The entry point that is creating the profile
+   * @param {object} [options]
+   * @param {boolean} [options.protect] Protect the new profile with Profile
+   * Lock. Defaults to newProfilesProtected.
+   * @param {boolean} [options.privateOnly=false] With protect, only allow
+   * private browsing in the new profile.
    *
    * @returns {SelectableProfile} The profile just created.
    */
   async createNewProfile(
     launchProfile = true,
     existingProfilePath = null,
-    source
+    source,
+    { protect = this.newProfilesProtected, privateOnly = false } = {}
   ) {
     await this.maybeSetupDataStore();
 
     let profile = await this.#createProfile(existingProfilePath, source);
+    // Profile Lock must be in place before the profile first starts: startup
+    // refuses to protect a profile that already holds unencrypted data.
+    if (protect && !existingProfilePath) {
+      lazy.writeProfileProtection(await profile.rootDir, { privateOnly });
+      await this.markGroupRequiresUnlock();
+    }
     if (launchProfile) {
       this.launchInstance(profile, ["about:newprofile"]);
     }

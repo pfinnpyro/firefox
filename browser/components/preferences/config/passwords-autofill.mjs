@@ -117,6 +117,19 @@ export class PasswordSettingHelpers {
    * the current master password.  When the dialog is dismissed, master password
    * UI is automatically updated.
    */
+  /**
+   * The primary password cannot be removed when a policy forbids it, nor in a
+   * profile protected by Profile Lock, whose data is encrypted under it.
+   *
+   * @returns {boolean}
+   */
+  static _canRemovePrimaryPassword() {
+    return (
+      Services.policies.isAllowed("removeMasterPassword") &&
+      !Services.prefs.getBoolPref("browser.profileLock.active", false)
+    );
+  }
+
   static async _removeMasterPassword() {
     const fipsUtils = Cc["@mozilla.org/security/fipsutils;1"].getService(
       Ci.nsIFIPSUtils
@@ -157,7 +170,7 @@ export class PasswordSettingHelpers {
       checkbox.checked = !noMP;
       checkbox.disabled =
         (noMP && !Services.policies.isAllowed("createMasterPassword")) ||
-        (!noMP && !Services.policies.isAllowed("removeMasterPassword"));
+        (!noMP && !PasswordSettingHelpers._canRemovePrimaryPassword());
     }
   }
 }
@@ -856,7 +869,7 @@ Preferences.addSetting({
     const button = config.options?.find(
       o => o.key === "turnOffPrimaryPassword"
     );
-    if (button && !Services.policies.isAllowed("removeMasterPassword")) {
+    if (button && !PasswordSettingHelpers._canRemovePrimaryPassword()) {
       button.controlAttrs = { ...button.controlAttrs, disabled: "" };
     }
     return config;

@@ -10,6 +10,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <iterator>
+#include <type_traits>
+
 #include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/GRefPtr.h"
 #include "mozilla/GUniquePtr.h"
@@ -312,6 +315,7 @@ void nsAppShell::SetSessionDBus(GDBusConnection* aDBusConnectionSession) {
   if (sAppShell) {
     sAppShell->mDBusConnectionSession = aDBusConnectionSession;
     DBusConnectionCheck();
+    sAppShell->SubscribeScreenSaverSignals();
   }
 }
 
@@ -319,6 +323,112 @@ void nsAppShell::SetSystemDBus(GDBusConnection* aDBusConnectionSystem) {
   if (sAppShell) {
     sAppShell->mDBusConnectionSystem = aDBusConnectionSystem;
     DBusConnectionCheck();
+    sAppShell->SubscribeLogin1SessionSignals();
+  }
+}
+
+static void NotifySessionLockChanged(bool aLocked) {
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  if (obs) {
+    obs->NotifyObservers(nullptr,
+                         aLocked ? NS_WIDGET_SESSION_LOCK_OBSERVER_TOPIC
+                                 : NS_WIDGET_SESSION_UNLOCK_OBSERVER_TOPIC,
+                         nullptr);
+  }
+}
+
+// Desktop screen lockers (GNOME, KDE and others implementing the freedesktop
+// interface) report ActiveChanged(b) on the session bus.
+static void ScreenSaverActiveChanged(GDBusConnection*, const gchar*,
+                                     const gchar*, const gchar*, const gchar*,
+                                     GVariant* aParameters, gpointer) {
+  if (!g_variant_is_of_type(aParameters, G_VARIANT_TYPE("(b)"))) {
+    return;
+  }
+  gboolean active = FALSE;
+  g_variant_get(aParameters, "(b)", &active);
+  NotifySessionLockChanged(active);
+}
+
+// logind emits Lock/Unlock on our session object, e.g. for `loginctl
+// lock-session` and for lockers that delegate to it.
+static void Login1SessionSignal(GDBusConnection*, const gchar*, const gchar*,
+                                const gchar*, const gchar* aSignalName,
+                                GVariant*, gpointer) {
+  if (!g_strcmp0(aSignalName, "Lock")) {
+    NotifySessionLockChanged(true);
+  } else if (!g_strcmp0(aSignalName, "Unlock")) {
+    NotifySessionLockChanged(false);
+  }
+}
+
+void nsAppShell::SubscribeScreenSaverSignals() {
+  if (!mDBusConnectionSession || mScreenSaverSignalIds[0]) {
+    return;
+  }
+  static const char* const kInterfaces[] = {"org.freedesktop.ScreenSaver",
+                                            "org.gnome.ScreenSaver"};
+  static_assert(std::size(kInterfaces) ==
+                std::extent_v<decltype(mScreenSaverSignalIds)>);
+  for (size_t i = 0; i < std::size(kInterfaces); ++i) {
+    mScreenSaverSignalIds[i] = g_dbus_connection_signal_subscribe(
+        mDBusConnectionSession, nullptr, kInterfaces[i], "ActiveChanged",
+        nullptr, nullptr, G_DBUS_SIGNAL_FLAGS_NONE, ScreenSaverActiveChanged,
+        nullptr, nullptr);
+  }
+}
+
+void nsAppShell::SubscribeLogin1SessionSignals() {
+  if (!mDBusConnectionSystem || mLogin1SessionCancellable) {
+    return;
+  }
+  // Signals are emitted on the session's real object path, not on the
+  // /session/auto alias, so resolve it first.
+  mLogin1SessionCancellable = dont_AddRef(g_cancellable_new());
+  g_dbus_connection_call(
+      mDBusConnectionSystem, "org.freedesktop.login1",
+      "/org/freedesktop/login1", "org.freedesktop.login1.Manager",
+      "GetSessionByPID", g_variant_new("(u)", guint32(getpid())),
+      G_VARIANT_TYPE("(o)"), G_DBUS_CALL_FLAGS_NONE, -1,
+      mLogin1SessionCancellable,
+      reinterpret_cast<GAsyncReadyCallback>(DBusLogin1SessionPathResponse),
+      nullptr);
+}
+
+void nsAppShell::DBusLogin1SessionPathResponse(GObject* aObject,
+                                               GAsyncResult* aResult,
+                                               gpointer) {
+  GUniquePtr<GError> error;
+  RefPtr<GVariant> result = dont_AddRef(g_dbus_connection_call_finish(
+      G_DBUS_CONNECTION(aObject), aResult, getter_Transfers(error)));
+  // Not part of a logind session (e.g. started from a system service), or
+  // cancelled at shutdown.
+  if (!result || !sAppShell || !sAppShell->mDBusConnectionSystem) {
+    return;
+  }
+  const gchar* path = nullptr;
+  g_variant_get(result, "(&o)", &path);
+  sAppShell->mLogin1SessionSignalId = g_dbus_connection_signal_subscribe(
+      sAppShell->mDBusConnectionSystem, "org.freedesktop.login1",
+      "org.freedesktop.login1.Session", nullptr, path, nullptr,
+      G_DBUS_SIGNAL_FLAGS_NONE, Login1SessionSignal, nullptr, nullptr);
+}
+
+void nsAppShell::UnsubscribeSessionLockSignals() {
+  if (mLogin1SessionCancellable) {
+    g_cancellable_cancel(mLogin1SessionCancellable);
+    mLogin1SessionCancellable = nullptr;
+  }
+  if (mLogin1SessionSignalId && mDBusConnectionSystem) {
+    g_dbus_connection_signal_unsubscribe(mDBusConnectionSystem,
+                                         mLogin1SessionSignalId);
+  }
+  mLogin1SessionSignalId = 0;
+  for (guint& id : mScreenSaverSignalIds) {
+    if (id && mDBusConnectionSession) {
+      g_dbus_connection_signal_unsubscribe(mDBusConnectionSession, id);
+    }
+    id = 0;
   }
 }
 
@@ -413,6 +523,8 @@ void nsAppShell::StopDBusListening() {
     mTimedate1ProxyCancellable = nullptr;
   }
   mTimedate1Proxy = nullptr;
+
+  UnsubscribeSessionLockSignals();
 
   DBusConnectionCheck();
   if (mDBusGetCancellableSession) {

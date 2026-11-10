@@ -17,6 +17,9 @@ import "chrome://global/content/elements/moz-button-group.mjs";
 const { SelectableProfile } = ChromeUtils.importESModule(
   "resource:///modules/profiles/SelectableProfile.sys.mjs"
 );
+const { readProfileProtection } = ChromeUtils.importESModule(
+  "moz-src:///toolkit/profile/ProfileProtectionFile.sys.mjs"
+);
 
 /**
  * Element used for displaying a SelectableProfile in the profile selector window
@@ -24,6 +27,7 @@ const { SelectableProfile } = ChromeUtils.importESModule(
 export class ProfileCard extends MozLitElement {
   static properties = {
     profile: { type: SelectableProfile, reflect: true },
+    isProtected: { type: Boolean, state: true },
   };
 
   static queries = {
@@ -39,6 +43,17 @@ export class ProfileCard extends MozLitElement {
 
     this.setBackgroundImage();
     this.setAvatarImage();
+    this.updateProtected();
+  }
+
+  async updateProtected() {
+    try {
+      this.isProtected = readProfileProtection(
+        await this.profile.rootDir
+      ).enabled;
+    } catch (e) {
+      this.isProtected = false;
+    }
   }
 
   setBackgroundImage() {
@@ -120,6 +135,14 @@ export class ProfileCard extends MozLitElement {
         </div>
         <div class="profile-details">
           <h3 class="text-truncated-ellipsis">${this.profile.name}</h3>
+          ${this.isProtected
+            ? html`<img
+                class="profile-protected-badge"
+                src="chrome://global/skin/icons/security.svg"
+                data-l10n-id="profile-card-protected"
+                data-l10n-attrs="alt,title"
+              />`
+            : null}
           <moz-button-group
             ><moz-button
               id="edit-button"

@@ -66,6 +66,11 @@
                 command="cmd_toggleOfflineStatus"
                 observes="cmd_toggleOfflineStatus"
                 data-l10n-id="menu-file-go-offline"/>
+      <menuitem id="menu_FileLockProfile"
+                hidden="true"
+                key="key_lockProfile"
+                command="cmd_lockProfile"
+                data-l10n-id="menu-file-lock-profile"/>
       <menuitem id="menu_FileQuitItem"
 #ifdef XP_MACOSX
                 data-l10n-id="menu-quit-mac"
@@ -345,6 +350,7 @@
     <menupopup id="menu_ProfilesPopup">
       <!-- Profile list gets inserted here -->
       <menuitem id="menu_newProfile" class="menuitem-iconic" command="Profiles:CreateProfile" data-l10n-id="menu-profiles-new-profile" />
+      <menuitem id="menu_newProtectedProfile" command="Profiles:CreateProtectedProfile" data-l10n-id="menu-profiles-new-protected-profile" />
       <menuseparator id="profilesSeparator" />
       <menuitem id="menu_manageProfiles" command="Profiles:ManageProfiles" data-l10n-id="menu-profiles-manage-profiles" />
     </menupopup>

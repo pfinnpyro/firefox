@@ -1673,6 +1673,18 @@ panelview .toolbarbutton-1,
   margin-inline-end: var(--space-xsmall);
 }
 
+/* Profiles protected by Profile Lock get a padlock after their name. */
+.profile-item-protected::after {
+  content: "";
+  flex-shrink: 0;
+  width: var(--icon-size-small);
+  height: var(--icon-size-small);
+  margin-inline-start: var(--space-small);
+  background: url("chrome://global/skin/icons/security.svg") center / contain no-repeat;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
 /* Adjust the Zoom toolbaritem padding to have its height the same as other toolbarbuttons,
  * also in compact density and touch mode. */
 #appMenu-zoom-controls {

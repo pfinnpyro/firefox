@@ -437,6 +437,7 @@ const CONFIG_PANES = Object.freeze({
     groupIds: [
       "securityPrivacyStatus",
       "securityPrivacyWarnings",
+      "profileLock",
       "etpStatus",
       "ipprotection",
       "cookiesAndSiteData",

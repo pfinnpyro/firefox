@@ -51,3 +51,11 @@ create-profile-choose-folder =
 create-profile-use-default =
   .label = Use Default Folder
   .accesskey = U
+
+create-profile-protect =
+  .label = Protect this profile with a password
+  .accesskey = P
+create-profile-protect-description = Everything the profile stores is encrypted, and it can only be opened after choosing it at startup and entering its password. You’ll choose the password the first time the profile opens. If you forget it, the data cannot be recovered.
+create-profile-private-only =
+  .label = Only allow private browsing in this profile
+  .accesskey = O

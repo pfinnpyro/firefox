@@ -218,6 +218,16 @@ search-tabs-shortcut =
 quit-app-shortcut =
     .key = Q
 
+lock-profile-shortcut =
+    .key = L
+
+# Toolbar button shown only in a password-protected profile. Locking closes
+# the browser; the profile then needs its password to open again.
+# $shortcut (String) - The keyboard shortcut for locking the profile.
+profile-lock-toolbar-button =
+    .label = Lock Profile
+    .tooltiptext = Lock this profile now ({ $shortcut })
+
 preferences-shortcut =
     .key = ,
 

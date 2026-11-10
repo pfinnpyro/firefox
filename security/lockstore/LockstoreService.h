@@ -91,6 +91,15 @@ class LockstoreService final : public nsILockstore, public nsIObserver {
                                const nsACString& aNewSecret);
   nsresult DoDeleteKek(const nsACString& aKekRef);
 
+  // The KEK a consumer should wrap a new DEK under: the profile password KEK
+  // when the profile has one (Profile Lock or the primary password link), so
+  // that new data is never left under a key that unwraps without a secret;
+  // otherwise the get-or-create LocalKey (aFallbackType, aFallbackIdentifier).
+  // A Profile Lock profile without its password KEK gets NS_ERROR_NOT_AVAILABLE
+  // instead of a LocalKey.
+  Result<nsCString, nsresult> DoResolveWrappingKek(
+      const nsACString& aFallbackType, const nsACString& aFallbackIdentifier);
+
  private:
   ~LockstoreService();
 

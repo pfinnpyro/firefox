@@ -13,6 +13,8 @@ document.addEventListener(
       ContainerCreationPanel:
         "chrome://browser/content/usercontext/ContainerCreationPanel.mjs",
       Referrals: "moz-src:///browser/components/referrals/Referrals.sys.mjs",
+      ProfileLock:
+        "moz-src:///browser/components/profilelock/ProfileLock.sys.mjs",
     });
 
     // <commandset id="mainCommandSet"> defined in browser-sets.inc.xhtml
@@ -117,6 +119,9 @@ document.addEventListener(
             break;
           case "cmd_quitApplication":
             goQuitApplication(event);
+            break;
+          case "cmd_lockProfile":
+            lazy.ProfileLock.lock("user");
             break;
           case "View:AboutProcesses":
             switchToTabHavingURI("about:processes", true);
@@ -286,6 +291,7 @@ document.addEventListener(
             break;
           // deliberate fallthrough
           case "Profiles:CreateProfile":
+          case "Profiles:CreateProtectedProfile":
           case "Profiles:ManageProfiles":
           case "Profiles:LaunchProfile":
           case "Profiles:MoveTabsToProfile":

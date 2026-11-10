@@ -57,6 +57,12 @@ class nsAppShell : public nsBaseAppShell {
   static void DBusConnectionCheck();
   static void SetSessionDBus(GDBusConnection* aDBusConnectionSession);
   static void SetSystemDBus(GDBusConnection* aDBusConnectionSystem);
+  void SubscribeScreenSaverSignals();
+  void SubscribeLogin1SessionSignals();
+  void UnsubscribeSessionLockSignals();
+  static void DBusLogin1SessionPathResponse(GObject* aObject,
+                                            GAsyncResult* aResult,
+                                            gpointer aUserData);
 #endif
 
   static void InstallTermSignalHandler();
@@ -87,6 +93,10 @@ class nsAppShell : public nsBaseAppShell {
   RefPtr<GDBusConnection> mDBusConnectionSystem;
   RefPtr<GCancellable> mDBusGetCancellableSession;
   RefPtr<GCancellable> mDBusGetCancellableSystem;
+  // Screen lock signals, which Profile Lock listens to.
+  RefPtr<GCancellable> mLogin1SessionCancellable;
+  guint mLogin1SessionSignalId = 0;
+  guint mScreenSaverSignalIds[2] = {0, 0};
 #endif
 };
 

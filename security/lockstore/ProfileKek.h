@@ -8,6 +8,7 @@
 #include "mozilla/FunctionRef.h"
 #include "mozilla/Maybe.h"
 #include "nsLiteralString.h"
+#include "nsStringFwd.h"
 
 namespace mozilla::security::lockstore {
 
@@ -24,6 +25,9 @@ enum class PrimaryPasswordSync {
   Unlock,
   // Bring a primary password lockstore knows nothing about under its wing.
   Adopt,
+  // Profile Lock requires a password and there is none yet: ask the user to
+  // choose one, set it as the primary password and adopt it.
+  Setup,
 };
 
 /**
@@ -36,9 +40,12 @@ enum class PrimaryPasswordSync {
  *                    startup means someone else opened it and owns it
  * aTokenHasPassword  queried only when the outcome turns on it, since
  *                    instantiating the internal key token is not free
+ * aPasswordRequired  whether the profile is protected by Profile Lock, which
+ *                    forbids running without a password KEK
  */
 Maybe<PrimaryPasswordSync> ChoosePrimaryPasswordSync(
-    bool aKekExists, bool aKekUnlocked, FunctionRef<bool()> aTokenHasPassword);
+    bool aKekExists, bool aKekUnlocked, FunctionRef<bool()> aTokenHasPassword,
+    bool aPasswordRequired = false);
 
 /**
  * Whether giving up on aSync leaves the session usable. Adoption is the one
@@ -46,7 +53,12 @@ Maybe<PrimaryPasswordSync> ChoosePrimaryPasswordSync(
  * still under the LocalKey. Giving up on an unlock leaves DEKs under a KEK this
  * session cannot unlock, which breaks every consumer of an encrypted database.
  */
-bool SyncIsSkippable(PrimaryPasswordSync aSync);
+bool SyncIsSkippable(PrimaryPasswordSync aSync, bool aPasswordRequired = false);
+
+/**
+ * Whether aKekRef names a LocalKey KEK, which unwraps without any secret.
+ */
+bool IsLocalKekRef(const nsACString& aKekRef);
 
 /**
  * While security.lockstore.unlock.enabled is set, bring the profile KEK in step

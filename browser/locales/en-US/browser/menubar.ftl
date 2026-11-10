@@ -121,6 +121,11 @@ menu-file-go-offline =
     .label = Work Offline
     .accesskey = k
 
+# Closes the browser so that the profile can only be reopened with its password.
+menu-file-lock-profile =
+    .label = Lock Profile
+    .accesskey = L
+
 ## Edit Menu
 
 menu-edit =
@@ -282,6 +287,10 @@ menu-profiles-manage-profiles =
     .label = Manage Profiles
 menu-profiles-new-profile =
     .label = New Profile
+# A profile whose data is encrypted and which needs a password to open
+# (Profile Lock).
+menu-profiles-new-protected-profile =
+    .label = New Protected Profile
 # Variables:
 #  $profileName (String): the name of the users profile
 menu-profiles-current =

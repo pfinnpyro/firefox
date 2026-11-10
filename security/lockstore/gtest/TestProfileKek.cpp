@@ -81,3 +81,55 @@ TEST(ProfileKek, OnlyAdoptionIsSkippable)
   EXPECT_TRUE(SyncIsSkippable(PrimaryPasswordSync::Adopt));
   EXPECT_FALSE(SyncIsSkippable(PrimaryPasswordSync::Unlock));
 }
+
+// Profile Lock: with no password anywhere, a protected profile must create
+// one rather than carry on under a LocalKey.
+TEST(ProfileKek, SetupWhenPasswordRequiredAndNoneExists)
+{
+  EXPECT_EQ(
+      ChoosePrimaryPasswordSync(/* kekExists */
+                                false,
+                                /* kekUnlocked */ false, [] { return false; },
+                                /* passwordRequired */ true),
+      Some(PrimaryPasswordSync::Setup));
+}
+
+TEST(ProfileKek, AdoptExistingPrimaryPasswordWhenPasswordRequired)
+{
+  EXPECT_EQ(
+      ChoosePrimaryPasswordSync(/* kekExists */
+                                false,
+                                /* kekUnlocked */ false, [] { return true; },
+                                /* passwordRequired */ true),
+      Some(PrimaryPasswordSync::Adopt));
+}
+
+TEST(ProfileKek, UnlockWhenPasswordRequired)
+{
+  EXPECT_EQ(
+      ChoosePrimaryPasswordSync(/* kekExists */ true,
+                                /* kekUnlocked */ false, TokenMustNotBeProbed,
+                                /* passwordRequired */ true),
+      Some(PrimaryPasswordSync::Unlock));
+}
+
+TEST(ProfileKek, NothingIsSkippableWhenPasswordRequired)
+{
+  EXPECT_FALSE(SyncIsSkippable(PrimaryPasswordSync::Adopt,
+                               /* passwordRequired */ true));
+  EXPECT_FALSE(SyncIsSkippable(PrimaryPasswordSync::Unlock,
+                               /* passwordRequired */ true));
+  EXPECT_FALSE(SyncIsSkippable(PrimaryPasswordSync::Setup,
+                               /* passwordRequired */ true));
+}
+
+TEST(ProfileKek, RecognizesLocalKekRefs)
+{
+  using mozilla::security::lockstore::IsLocalKekRef;
+  using mozilla::security::lockstore::kProfileLocalKek;
+  using mozilla::security::lockstore::kProfilePasswordKek;
+  EXPECT_TRUE(IsLocalKekRef(kProfileLocalKek));
+  EXPECT_TRUE(IsLocalKekRef("lockstore::kek::local:sqlite"_ns));
+  EXPECT_FALSE(IsLocalKekRef(kProfilePasswordKek));
+  EXPECT_FALSE(IsLocalKekRef("lockstore::kek::pkcs11:abc"_ns));
+}

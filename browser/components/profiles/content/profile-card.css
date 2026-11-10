@@ -89,6 +89,15 @@
   -moz-context-properties: fill, stroke;
 }
 
+.profile-protected-badge {
+  flex-shrink: 0;
+  width: var(--icon-size-small);
+  height: var(--icon-size-small);
+  margin-inline: var(--space-small) auto;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
 .profile-details {
   display: flex;
   align-items: center;

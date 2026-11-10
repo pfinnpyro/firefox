@@ -131,6 +131,9 @@ void SetWindowStyles(HWND, const WindowStyles&);
 
 class nsWindow final : public nsIWidget {
  public:
+  // Notifies sleep_notification / wake_notification, once per change.
+  static void PostSleepWakeNotification(const bool aIsSleepMode);
+
   using Styles = mozilla::widget::WindowStyles;
   using WindowHook = mozilla::widget::WindowHook;
   using IMEContext = mozilla::widget::IMEContext;
@@ -586,7 +589,6 @@ class nsWindow final : public nsIWidget {
   static bool EventIsInsideWindow(
       nsWindow* aWindow,
       mozilla::Maybe<POINT> aEventPoint = mozilla::Nothing());
-  static void PostSleepWakeNotification(const bool aIsSleepMode);
   int32_t ClientMarginHitTestPoint(int32_t aX, int32_t aY);
   void SetWindowButtonRect(WindowButtonType aButtonType,
                            const LayoutDeviceIntRect& aClientRect) override {

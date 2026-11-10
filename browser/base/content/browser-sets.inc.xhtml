@@ -40,6 +40,7 @@
     <command id="cmd_CustomizeToolbars" />
     <command id="cmd_toggleOfflineStatus" />
     <command id="cmd_quitApplication" />
+    <command id="cmd_lockProfile" disabled="true" />
 
     <command id="View:AboutProcesses" />
     <command id="View:PageSource" />
@@ -81,6 +82,7 @@
     <command id="Browser:DuplicateTab" />
     <command id="Browser:CopyTabURL" />
     <command id="Profiles:CreateProfile" />
+    <command id="Profiles:CreateProtectedProfile" />
     <command id="Profiles:ManageProfiles" />
     <command id="Profiles:LaunchProfile" />
     <command id="Profiles:MoveTabsToProfile" />
@@ -372,6 +374,8 @@
          command="cmd_quitApplication"
 #endif
          reserved="true"/>
+
+    <key id="key_lockProfile" data-l10n-id="lock-profile-shortcut" command="cmd_lockProfile" modifiers="accel,shift"/>
 
     <key id="key_restoreLastClosedTabOrWindowOrSession" command="History:RestoreLastClosedTabOrWindowOrSession" data-l10n-id="tab-new-shortcut" modifiers="accel,shift"/>
     <key id="key_undoCloseWindow" command="History:UndoCloseWindow" data-l10n-id="window-new-shortcut" modifiers="accel,shift"/>

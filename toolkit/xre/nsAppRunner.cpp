@@ -21,6 +21,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/ProfileProtection.h"
 #include "mozilla/PreferenceSheet.h"
 #include "mozilla/Printf.h"
 #include "mozilla/ProcessType.h"
@@ -3212,6 +3213,24 @@ static bool ShouldSkipProfileDialogForWebAuth() {
 #endif
 }
 
+// Whether aProfile belongs to a group of selectable profiles.
+static bool IsInProfileGroup(nsIToolkitProfile* aProfile) {
+#ifdef MOZ_SELECTABLE_PROFILES
+  nsCString storeID;
+  return aProfile && NS_SUCCEEDED(aProfile->GetStoreID(storeID)) &&
+         !storeID.IsVoid();
+#else
+  return false;
+#endif
+}
+
+// Profile Lock: whether the user must choose a profile before any opens.
+static bool IsProfileChoiceRequired(nsToolkitProfileService* aProfileSvc,
+                                    nsIFile* aProfileDir) {
+  return aProfileSvc->HasProfileRequiringUnlock() ||
+         ReadProfileProtection(aProfileDir).mEnabled;
+}
+
 static bool gDoMigration = false;
 static bool gDoProfileReset = false;
 constinit static nsCOMPtr<nsIToolkitProfile> gResetOldProfile;
@@ -5881,6 +5900,12 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   if (wasDefaultSelection) {
     if (ShouldSkipProfileDialogForWebAuth()) {
       rv = NS_OK;
+    } else if (IsProfileChoiceRequired(mProfileSvc, mProfD)) {
+      // Profile Lock always requires an explicit choice of profile. A profile
+      // group uses its own selector, which lists the profiles of the group.
+      rv = IsInProfileGroup(profile)
+               ? ShowProfileSelector(profileSvc, nativeApp)
+               : ShowProfileManager(profileSvc, nativeApp);
     } else if (!mProfileSvc->GetStartWithLastProfile()) {
       // First check the old style profile manager
       rv = ShowProfileManager(profileSvc, nativeApp);
@@ -5911,6 +5936,13 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   }
   if (NS_FAILED(rv)) {
     return 1;
+  }
+
+  if (gDoProfileReset && ReadProfileProtection(mProfD).mEnabled) {
+    // A reset copies data out of the old profile into an unprotected one,
+    // which would both fail on encrypted stores and drop the protection.
+    NS_WARNING("Refusing to reset a profile protected by Profile Lock.");
+    gDoProfileReset = false;
   }
 
   if (gDoProfileReset) {
@@ -6015,8 +6047,13 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   if (!BackgroundTasks::IsBackgroundTaskMode())
 #endif
   {
+    // A Profile Lock profile always runs with encryption on, whatever the
+    // build-wide pref says; ApplyProfileProtectionPrefs forces the pref on
+    // before profile-do-change.
+    SetStartupProfileProtection(ReadProfileProtection(mProfD));
     bool prefEnabled =
-        StaticPrefs::security_storage_encryption_sqlite_enabled();
+        StaticPrefs::security_storage_encryption_sqlite_enabled() ||
+        GetStartupProfileProtection().mEnabled;
     EncryptionCompatResult ec =
         CheckEncryptionCompatibility(mProfD, prefEnabled);
     if (ec != EncryptionCompatResult::OK) {
